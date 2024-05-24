@@ -14,7 +14,7 @@ const ballSprite = new Image()
 const backgroundImage = new Image()
 
 
-let startPos = null
+let clickedBub = null
 
 
 class Bubble {
@@ -158,6 +158,10 @@ class Bubble {
     this.rot = this.rot || Math.PI*2*Math.random()
     draw_image(this.sprite,this.pos,this.radius*2,this.rot)
   }
+  is_inside(pos){
+    const dist = pos.sub(this.pos).length()
+    return (dist <= this.radius)
+  }
 }
 
 function draw_image(img,pos,scale,rotation){
@@ -213,29 +217,58 @@ function render() {
     b.render()
   })
 
-  if (startPos) {
+  if (clickedBub) {
+    const bubPos = clickedBub.pos
+    const end = bubPos.add(bubPos.sub(mousePos))
     ctx.fillStyle = "blue"
-    draw_circle(startPos, 25)
+    draw_circle(end, clickedBub.radius)
     ctx.beginPath()
     ctx.strokeStyle = `rgb(0 0 0)`;
-    ctx.moveTo(startPos.x, startPos.y)
-    let end = startPos.add(startPos.sub(mousePos))
+    ctx.moveTo(bubPos.x, bubPos.y)
     ctx.lineTo(end.x, end.y)
     ctx.stroke()
   }
+}
+
+function raycast_sphere(from,to,steps=100){
+  for (let i = 0; i < steps; i++) {
+        
+  }
+}
+
+function get_bubble_in_pos(pos){
+  for (let i = 0; i < bubbles.length; i++) {
+    const b = bubbles[i];
+    if (b.is_inside(pos)){
+      return b
+    }
+  }
+  return null
 }
 canvas.addEventListener("mousemove", (e) => {
   mousePos = new Vector(e.clientX, e.clientY)
 })
 
 canvas.addEventListener("mousedown", (e) => {
-  startPos = mousePos.mult(1)
+  mousePos = new Vector(e.clientX, e.clientY)
+
+  clickedBub = get_bubble_in_pos(mousePos)
 })
 canvas.addEventListener("mouseup", (e) => {
-  const newBub = new Bubble(startPos.mult(1), Math.random()*10+40, startPos.sub(mousePos).div(10))
+  mousePos = new Vector(e.clientX, e.clientY)
+  if (clickedBub){
+    clickedBub.velocity = clickedBub.pos.sub(mousePos).div(10)
+    clickedBub = null
+  }
+})
+document.addEventListener("keydown",(e)=>{
+  // mousePos = new Vector(e.clientX, e.clientY)
+
+  const newBub = new Bubble(mousePos.mult(1), Math.random()*10+40, new Vector())
   newBub.sprite.src = "./balls/"+Math.ceil(Math.random()*32)+".png"
   bubbles.push(newBub)
-  startPos = null
+
+  console.log("ASD")
 })
   ; (() => {
     function main(tFrame) {
