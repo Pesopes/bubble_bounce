@@ -5,9 +5,9 @@ const ctx = canvas.getContext("2d");
 
 let mousePos = new Vector()
 
-let bubbles = []
+const bubbles = []
 
-let gravity = 0.0
+const gravity = 0.0
 const drag = 0.99
 const damping = 0.99
 const ballSprite = new Image()
@@ -57,13 +57,13 @@ class Bubble {
     }
   }
   isColliding(other){
-    let vec = this.pos.sub(other.pos)
+    const  vec = this.pos.sub(other.pos)
     const minDistance = this.radius + other.radius;
     const distance = vec.length()
     return (distance <= minDistance)
   }
   collide(other) {
-    let vec = this.pos.sub(other.pos)
+    const  vec = this.pos.sub(other.pos)
     const minDistance = this.radius + other.radius;
     const distance = vec.length()
     if (distance <= minDistance) {
@@ -72,10 +72,10 @@ class Bubble {
       const collisionNormal = vec.normalize();
 
       // Calculate relative velocity
-      let relativeVelocity = this.velocity.sub(other.velocity);
+      const  relativeVelocity = this.velocity.sub(other.velocity);
 
       // Calculate the velocity change based on the relative velocity and masses
-      let velocityChange = collisionNormal.mult(2 * relativeVelocity.dot(collisionNormal) / (this.mass() + other.mass()));
+      const  velocityChange = collisionNormal.mult(2 * relativeVelocity.dot(collisionNormal) / (this.mass() + other.mass()));
 
       // Apply velocity change to the velocities of both balls
       this.velocity = this.velocity.sub(velocityChange.mult(other.mass()));
@@ -201,9 +201,11 @@ function init() {
 function update(tFrame) {
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
-  bubbles.forEach((b, i) => {
-    b.update()
-    bubbles.slice(i + 1).forEach((b2) => b.collide(b2))
+  bubbles.forEach((b1,i) =>{
+    b1.update()
+    for(b2 of bubbles.slice(i + 1)){
+      b1.collide(b2)
+    }
   })
 }
 function render() {
@@ -211,23 +213,23 @@ function render() {
   ctx.fillStyle = "#ffa3ff"
   ctx.fillRect(0,0, canvas.width, canvas.height)
   ctx.drawImage(backgroundImage,0,0,canvas.width,canvas.height)
-  bubbles.forEach((b, i) => {
-    bubbles.slice(i + 1).forEach((b2) => {
+  bubbles.forEach((b1,i) =>{
+    for(b2 of bubbles.slice(i + 1)){
       const maxDistance = 400
-      const distance = b.pos.sub(b2.pos).length()
+      const distance = b1.pos.sub(b2.pos).length()
       if (distance > 400)
         return
       ctx.beginPath()
       ctx.strokeStyle = `rgba(0, 0, 0, ${1 - distance / 400})`;
-      ctx.moveTo(b.pos.x, b.pos.y)
+      ctx.moveTo(b1.pos.x, b1.pos.y)
       ctx.lineTo(b2.pos.x, b2.pos.y)
       ctx.stroke()
-    })
+    }
   })
 
-  bubbles.forEach((b) => {
-    b.render()
-  })
+  for(b1 of bubbles){
+    b1.render()
+  }
 
   if (clickedBub) {
     const bubPos = clickedBub.pos
@@ -237,13 +239,13 @@ function render() {
     ctx.fillStyle = "blue"
     drawCircle(end, clickedBub.radius)
     ctx.beginPath()
-    ctx.strokeStyle = `rgb(0 0 0)`;
+    ctx.strokeStyle = "rgb(0 0 0)";
     ctx.moveTo(bubPos.x, bubPos.y)
     ctx.lineTo(end.x, end.y)
     ctx.stroke()
 
     ctx.beginPath()
-    ctx.strokeStyle = `rgb(0 0 44)`;
+    ctx.strokeStyle = "rgb(0 0 44)";
     ctx.moveTo(bubPos.x, bubPos.y)
     ctx.lineTo(raycastEnd.x, raycastEnd.y)
     ctx.stroke()
@@ -296,8 +298,9 @@ document.addEventListener("keydown",(e)=>{
   // mousePos = new Vector(e.clientX, e.clientY)
 
   const newBub = new Bubble(mousePos.mult(1), Math.random()*10+40, new Vector())
-  newBub.sprite.src = "./balls/"+Math.ceil(Math.random()*32)+".png"
+  newBub.sprite.src = `./balls/${Math.ceil(Math.random()*32)}.png` 
   bubbles.push(newBub)
+
 
 })
   ; (() => {
