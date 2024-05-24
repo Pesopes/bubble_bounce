@@ -56,6 +56,12 @@ class Bubble {
       this.pos.y = canvas.height - this.radius
     }
   }
+  isColliding(other){
+    let vec = this.pos.sub(other.pos)
+    const minDistance = this.radius + other.radius;
+    const distance = vec.length()
+    return (distance <= minDistance)
+  }
   collide(other) {
     let vec = this.pos.sub(other.pos)
     const minDistance = this.radius + other.radius;
@@ -146,7 +152,7 @@ class Bubble {
 
   render() {
     //TODO: color
-    // draw_circle(this.pos, this.radius)
+    // drawCircle(this.pos, this.radius)
     // const imgX = this.pos.x-this.radius
     // const imgY = this.pos.y-this.radius
     // ctx.save()
@@ -156,15 +162,21 @@ class Bubble {
     // ctx.restore()
     ctx.fillStyle = "rgb(200 0 0)";
     this.rot = this.rot || Math.PI*2*Math.random()
-    draw_image(this.sprite,this.pos,this.radius*2,this.rot)
+    drawImage(this.sprite,this.pos,this.radius*2,this.rot)
   }
-  is_inside(pos){
+
+  simpleRender(){
+    ctx.fillStyle = "blue"
+    drawCircle(this.pos, this.radius)
+  }
+
+  isInside(pos){
     const dist = pos.sub(this.pos).length()
     return (dist <= this.radius)
   }
 }
 
-function draw_image(img,pos,scale,rotation){
+function drawImage(img,pos,scale,rotation){
   ctx.save()
   ctx.translate(pos.x,pos.y)
   ctx.rotate(rotation);
@@ -172,7 +184,7 @@ function draw_image(img,pos,scale,rotation){
   ctx.restore()
 }
 
-function draw_circle(pos, radius) {
+function drawCircle(pos, radius) {
   ctx.beginPath()
   ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
   ctx.fill()
@@ -219,27 +231,46 @@ function render() {
 
   if (clickedBub) {
     const bubPos = clickedBub.pos
-    const end = bubPos.add(bubPos.sub(mousePos))
+    // const end = bubPos.add(bubPos.sub(mousePos))
+    const raycastEnd = bubPos.add(bubPos.sub(mousePos).normalize().mult(10000))
+    const end = raycastSphere(bubPos, raycastEnd,clickedBub,10000) || bubPos.add(bubPos.sub(mousePos))
     ctx.fillStyle = "blue"
-    draw_circle(end, clickedBub.radius)
+    drawCircle(end, clickedBub.radius)
     ctx.beginPath()
     ctx.strokeStyle = `rgb(0 0 0)`;
     ctx.moveTo(bubPos.x, bubPos.y)
     ctx.lineTo(end.x, end.y)
     ctx.stroke()
+
+    ctx.beginPath()
+    ctx.strokeStyle = `rgb(0 0 44)`;
+    ctx.moveTo(bubPos.x, bubPos.y)
+    ctx.lineTo(raycastEnd.x, raycastEnd.y)
+    ctx.stroke()
   }
 }
 
-function raycast_sphere(from,to,steps=100){
-  for (let i = 0; i < steps; i++) {
-        
+function raycastSphere(from,to,radius,exclude,steps=100){
+  const dir = to.sub(from)
+  for (let i = 1; i <= steps; i++) {
+    const progress = i/steps
+    const testPos = from.add(dir.mult(progress))
+    const testBub = new Bubble(testPos,radius)
+    for (let bi = 0; bi < bubbles.length; bi++) {
+      const otherBub = bubbles[bi];
+      testBub.simpleRender()
+      if(JSON.stringify(otherBub) !== JSON.stringify(exclude) && testBub.isColliding(otherBub)){
+        return testBub.pos.mult(1)
+      }
+    }
   }
+  return null
 }
 
 function get_bubble_in_pos(pos){
   for (let i = 0; i < bubbles.length; i++) {
     const b = bubbles[i];
-    if (b.is_inside(pos)){
+    if (b.isInside(pos)){
       return b
     }
   }
@@ -268,7 +299,6 @@ document.addEventListener("keydown",(e)=>{
   newBub.sprite.src = "./balls/"+Math.ceil(Math.random()*32)+".png"
   bubbles.push(newBub)
 
-  console.log("ASD")
 })
   ; (() => {
     function main(tFrame) {
