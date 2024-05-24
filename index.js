@@ -85,20 +85,69 @@ class Bubble {
 		const distance = vec.length();
 		return distance <= minDistance;
 	}
-	// simplified version without block radius
+	// Unnecessary code copying from collision resolution (TODO: fix)
 	isCollidingBlock(block) {
+		const borderRadius = block.borderRadius || 10;
+		let collisionDetected = false;
+		let normal = new Vector(0, 0);
+		let penetrationDepth = 0;
+
+		// Check collision with rectangle edges (excluding corners)
 		const px = Math.max(
-			block.pos.x,
-			Math.min(this.pos.x, block.pos.x + block.dim.x),
+			block.pos.x + borderRadius,
+			Math.min(this.pos.x, block.pos.x + block.dim.x - borderRadius),
 		);
 		const py = Math.max(
-			block.pos.y,
-			Math.min(this.pos.y, block.pos.y + block.dim.y),
+			block.pos.y + borderRadius,
+			Math.min(this.pos.y, block.pos.y + block.dim.y - borderRadius),
 		);
 		const collisionPoint = new Vector(px, py);
 		const dist = this.pos.sub(collisionPoint).length();
 
-		return dist <= this.radius;
+		if (dist <= this.radius) {
+			collisionDetected = true;
+
+			// Determine the collision normal for edges
+			if (px === block.pos.x + borderRadius) {
+				normal = new Vector(-1, 0); // Left edge
+			} else if (px === block.pos.x + block.dim.x - borderRadius) {
+				normal = new Vector(1, 0); // Right edge
+			} else if (py === block.pos.y + borderRadius) {
+				normal = new Vector(0, -1); // Top edge
+			} else if (py === block.pos.y + block.dim.y - borderRadius) {
+				normal = new Vector(0, 1); // Bottom edge
+			}
+
+			penetrationDepth = this.radius - dist;
+		}
+
+		// Check collision with rectangle corners
+		const corners = [
+			new Vector(block.pos.x + borderRadius, block.pos.y + borderRadius), // Top-left
+			new Vector(
+				block.pos.x + block.dim.x - borderRadius,
+				block.pos.y + borderRadius,
+			), // Top-right
+			new Vector(
+				block.pos.x + borderRadius,
+				block.pos.y + block.dim.y - borderRadius,
+			), // Bottom-left
+			new Vector(
+				block.pos.x + block.dim.x - borderRadius,
+				block.pos.y + block.dim.y - borderRadius,
+			), // Bottom-right
+		];
+
+		for (const corner of corners) {
+			const cornerDist = this.pos.sub(corner).length();
+			if (cornerDist <= this.radius + borderRadius) {
+				collisionDetected = true;
+				normal = this.pos.sub(corner).normalize();
+				penetrationDepth = this.radius + borderRadius - cornerDist;
+				break;
+			}
+		}
+		return collisionDetected;
 	}
 	collideBlock(block) {
 		const borderRadius = block.borderRadius || 10;
@@ -350,7 +399,7 @@ function drawRoundedRect(x, y, width, height, borderRadius) {
 function init() {
 	ballSprite.src = "./ball_sprite.png";
 	backgroundImage.src = "./bliss.jpg";
-	blocks.push(new Block(new Vector(400, 200), new Vector(50, 500)));
+	blocks.push(new Block(new Vector(400, 200), new Vector(500, 500), 200));
 }
 
 function update(tFrame) {
