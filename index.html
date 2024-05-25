@@ -5,21 +5,25 @@
     <script src="lib.js"></script>
     <script src="index.js" defer></script>
     <style>
-        body{
-            padding: 0%;
-            margin: 0%;
-        }
-        canvas{
-            position:absolute;
-            width: 100%;
+        body, html {
+            margin: 0;
+            padding: 0;
             height: 100%;
-            margin: 0px;
-        }
+            touch-action:none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: url("./bliss.jpg");
+            background-size: cover;}
+        canvas {
+            width: 100%;
+            max-height: 100vh;
+        }    
     </style>
 </head>
 <body>
     <canvas id="main-canvas">
-        This is the main canvas where the content is. If you see this text your browser cannot load it.
+        This is the main canvas where the content is. If you see this text your browser cannot load it. Try a different browser or a different device.
     </canvas>
 </body>
 </html>

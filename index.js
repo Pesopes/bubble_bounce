@@ -89,8 +89,6 @@ class Bubble {
 	isCollidingBlock(block) {
 		const borderRadius = block.borderRadius || 10;
 		let collisionDetected = false;
-		let normal = new Vector(0, 0);
-		let penetrationDepth = 0;
 
 		// Check collision with rectangle edges (excluding corners)
 		const px = Math.max(
@@ -103,23 +101,6 @@ class Bubble {
 		);
 		const collisionPoint = new Vector(px, py);
 		const dist = this.pos.sub(collisionPoint).length();
-
-		if (dist <= this.radius) {
-			collisionDetected = true;
-
-			// Determine the collision normal for edges
-			if (px === block.pos.x + borderRadius) {
-				normal = new Vector(-1, 0); // Left edge
-			} else if (px === block.pos.x + block.dim.x - borderRadius) {
-				normal = new Vector(1, 0); // Right edge
-			} else if (py === block.pos.y + borderRadius) {
-				normal = new Vector(0, -1); // Top edge
-			} else if (py === block.pos.y + block.dim.y - borderRadius) {
-				normal = new Vector(0, 1); // Bottom edge
-			}
-
-			penetrationDepth = this.radius - dist;
-		}
 
 		// Check collision with rectangle corners
 		const corners = [
@@ -142,8 +123,6 @@ class Bubble {
 			const cornerDist = this.pos.sub(corner).length();
 			if (cornerDist <= this.radius + borderRadius) {
 				collisionDetected = true;
-				normal = this.pos.sub(corner).normalize();
-				penetrationDepth = this.radius + borderRadius - cornerDist;
 				break;
 			}
 		}
@@ -317,13 +296,6 @@ class Bubble {
 	render() {
 		//TODO: color
 		// drawCircle(this.pos, this.radius)
-		// const imgX = this.pos.x-this.radius
-		// const imgY = this.pos.y-this.radius
-		// ctx.save()
-		// ctx.translate(imgX,imgY,canvas.width/this.radius*2,canvas.height/this.radius*2)
-		// ctx.rotate(Math.PI)
-		// ctx.drawImage(this.sprite,0,0)
-		// ctx.restore()
 		ctx.fillStyle = "rgb(200 0 0)";
 		this.rot = this.rot || Math.PI * 2 * Math.random();
 		drawImage(this.sprite, this.pos, this.radius * 2, this.rot);
@@ -359,17 +331,13 @@ function drawRoundedRect(x, y, width, height, borderRadius) {
 	ctx.strokeStyle = "rgba(0, 0, 0, 1.0)";
 	ctx.lineWidth = 6;
 	ctx.beginPath();
-
 	// Top side
 	ctx.moveTo(x + borderRadius, y);
 	ctx.lineTo(x + width - borderRadius, y);
-
 	// Top right corner
 	ctx.arcTo(x + width, y, x + width, y + borderRadius, borderRadius);
-
 	// Right side
 	ctx.lineTo(x + width, y + height - borderRadius);
-
 	// Bottom right corner
 	ctx.arcTo(
 		x + width,
@@ -378,33 +346,42 @@ function drawRoundedRect(x, y, width, height, borderRadius) {
 		y + height,
 		borderRadius,
 	);
-
 	// Bottom side
 	ctx.lineTo(x + borderRadius, y + height);
-
 	// Bottom left corner
 	ctx.arcTo(x, y + height, x, y + height - borderRadius, borderRadius);
-
 	// Left side
 	ctx.lineTo(x, y + borderRadius);
-
 	// Top left corner
 	ctx.arcTo(x, y, x + borderRadius, y, borderRadius);
-
-	// Close path and stroke/fill
-	// ctx.closePath();
 	ctx.stroke();
 	ctx.fill();
 }
 function init() {
+	resizeCanvas();
 	ballSprite.src = "./ball_sprite.png";
 	backgroundImage.src = "./bliss.jpg";
-	blocks.push(new Block(new Vector(400, 200), new Vector(500, 500), 200));
+	blocks.push(
+		new Block(
+			new Vector(canvas.width / 2, canvas.height / 2),
+			new Vector(500, 500),
+			200,
+		),
+	);
+	for (let i = 0; i <= 10; i++) {
+		bubbles.push(new Bubble(new Vector(40, 40), 50, new Vector()));
+	}
 }
 
+function resizeCanvas() {
+	const screenWidth = window.innerWidth;
+	const screenHeight = window.innerHeight;
+
+	canvas.height = 1600;
+	canvas.width = 900;
+}
+// Generic update func, handles collision
 function update(tFrame) {
-	canvas.width = window.innerWidth;
-	canvas.height = window.innerHeight;
 	bubbles.forEach((b1, i) => {
 		b1.update();
 		for (const b2 of bubbles.slice(i + 1)) {
@@ -415,6 +392,7 @@ function update(tFrame) {
 		}
 	});
 }
+// Handles rendering of all objects and other stuff like the charge up lines
 function render() {
 	// Reset screen
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -427,9 +405,10 @@ function render() {
 		for (b2 of bubbles.slice(i + 1)) {
 			const maxDistance = 400;
 			const distance = b1.pos.sub(b2.pos).length();
-			if (distance > 400) return;
+			if (distance > maxDistance) return;
 			ctx.beginPath();
-			ctx.strokeStyle = `rgba(0, 0, 0, ${1 - distance / 400})`;
+			ctx.strokeStyle = `rgba(0, 0, 0, ${1 - distance / maxDistance})`;
+			ctx.lineWidth = 1;
 			ctx.moveTo(b1.pos.x, b1.pos.y);
 			ctx.lineTo(b2.pos.x, b2.pos.y);
 			ctx.stroke();
@@ -437,7 +416,7 @@ function render() {
 	});
 
 	// render objects using their functions
-	for (block of blocks) {
+	for (const block of blocks) {
 		block.render();
 	}
 	for (bub of bubbles) {
@@ -452,19 +431,18 @@ function render() {
 		const raycastEnd = bubPos.add(
 			bubPos.sub(mousePos).normalize().mult(maxRaycast),
 		);
-		let end = raycastSphere(
+		const raycastHit = raycastSphere(
 			bubPos,
 			raycastEnd,
 			clickedBub.radius,
 			clickedBub,
 			200,
 		);
-		if (end) {
+		if (raycastHit) {
 			ctx.fillStyle = "blue";
-			drawCircle(end, clickedBub.radius);
-		} else {
-			end = bubPos.add(bubPos.sub(mousePos));
+			drawCircle(raycastHit, clickedBub.radius);
 		}
+		end = bubPos.add(bubPos.sub(mousePos));
 		ctx.beginPath();
 		ctx.strokeStyle = "rgb(0 0 0)";
 		ctx.lineWidth = 6;
@@ -508,17 +486,31 @@ function get_bubble_in_pos(pos) {
 	}
 	return null;
 }
-canvas.addEventListener("mousemove", (e) => {
-	mousePos = new Vector(e.clientX, e.clientY);
+
+function getMousePos(event) {
+	const rect = canvas.getBoundingClientRect();
+	const scaleX = canvas.width / rect.width;
+	const scaleY = canvas.height / rect.height;
+
+	return new Vector(
+		(event.clientX - rect.left) * scaleX,
+		(event.clientY - rect.top) * scaleY,
+	);
+}
+
+window.addEventListener("resize", resizeCanvas);
+document.addEventListener("pointermove", (e) => {
+	mousePos = getMousePos(e);
 });
 
-canvas.addEventListener("mousedown", (e) => {
-	mousePos = new Vector(e.clientX, e.clientY);
+document.addEventListener("pointerdown", (e) => {
+	mousePos = getMousePos(e);
 
 	clickedBub = get_bubble_in_pos(mousePos);
 });
-canvas.addEventListener("mouseup", (e) => {
-	mousePos = new Vector(e.clientX, e.clientY);
+document.addEventListener("pointerup", (e) => {
+	mousePos = getMousePos(e);
+
 	if (clickedBub) {
 		clickedBub.velocity = clickedBub.pos.sub(mousePos).div(10);
 		clickedBub = null;
@@ -527,11 +519,7 @@ canvas.addEventListener("mouseup", (e) => {
 document.addEventListener("keydown", (e) => {
 	// mousePos = new Vector(e.clientX, e.clientY)
 
-	const newBub = new Bubble(
-		mousePos.mult(1),
-		Math.random() * 10 + 40,
-		new Vector(),
-	);
+	const newBub = new Bubble(mousePos.mult(1), 40, new Vector());
 	newBub.sprite.src = `./balls/${Math.ceil(Math.random() * 32)}.png`;
 	bubbles.push(newBub);
 });
