@@ -19,7 +19,7 @@ class Block {
 	pos;
 	dim;
 	borderRadius;
-	constructor(pos, dim, borderRadius = 5) {
+	constructor(pos, dim, borderRadius = 1) {
 		this.pos = pos;
 		this.dim = dim;
 		this.borderRadius = borderRadius;
@@ -335,25 +335,37 @@ function drawRoundedRect(x, y, width, height, borderRadius) {
 }
 function prepareBoard() {
 	const sideBlockDim = new Vector(50, 700);
-	blocks.push(
-		new Block(
-			new Vector(sideBlockDim.x / 5, (canvas.height - sideBlockDim.y) / 2),
-			sideBlockDim.mult(1),
-		),
+	const sideBlockOffset = sideBlockDim.x / 5;
+	const rightBlockPos = new Vector(
+		canvas.width - sideBlockOffset - sideBlockDim.x,
+		(canvas.height - sideBlockDim.y) / 2,
 	);
 	blocks.push(
 		new Block(
-			new Vector(
-				canvas.width - sideBlockDim.x / 5 - sideBlockDim.x,
-				(canvas.height - sideBlockDim.y) / 2,
-			),
+			new Vector(sideBlockOffset, (canvas.height - sideBlockDim.y) / 2),
 			sideBlockDim.mult(1),
+		),
+	);
+	blocks.push(new Block(rightBlockPos, sideBlockDim.mult(1)));
+
+	const midBlockPos = new Vector(
+		sideBlockOffset +
+			sideBlockDim.x +
+			Math.random() * (canvas.width - 2 * (sideBlockOffset - sideBlockDim.x)),
+		(canvas.height - sideBlockDim.x) / 2,
+	);
+
+	// Spawn mid blocks
+	blocks.push(
+		new Block(
+			midBlockPos,
+			new Vector(rightBlockPos.x - midBlockPos.x, sideBlockDim.x),
 		),
 	);
 }
 function init() {
 	resizeCanvas();
-	backgroundImage.src = "./bliss.jpg";
+	// backgroundImage.src = "./abstract_dots_2.svg";
 	for (let i = 0; i <= 10; i++) {
 		bubbles.push(new Bubble(new Vector(40, 40), 50, new Vector()));
 	}
@@ -383,7 +395,7 @@ function render() {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	ctx.fillStyle = "#ffa3ff";
 	ctx.fillRect(0, 0, canvas.width, canvas.height);
-	ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+	// ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
 
 	// Lines between near bubbles
 	bubbles.forEach((b1, i) => {
@@ -488,16 +500,22 @@ document.addEventListener("pointermove", (e) => {
 	mousePos = getMousePos(e);
 });
 
+// start aiming (saves the clicked bubble)
 document.addEventListener("pointerdown", (e) => {
 	mousePos = getMousePos(e);
 
 	clickedBub = get_bubble_in_pos(mousePos);
 });
+// Stopped aiming -> shoot
 document.addEventListener("pointerup", (e) => {
 	mousePos = getMousePos(e);
 
 	if (clickedBub) {
-		clickedBub.velocity = clickedBub.pos.sub(mousePos).div(10);
+		const maxVelocity = 18;
+		const dirVec = clickedBub.pos.sub(mousePos).div(16);
+		clickedBub.velocity = dirVec
+			.normalize()
+			.mult(Math.min(dirVec.length(), maxVelocity));
 		clickedBub = null;
 	}
 });
