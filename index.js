@@ -11,7 +11,6 @@ const blocks = [];
 const gravity = 0.0;
 const drag = 0.99;
 const damping = 0.99;
-const ballSprite = new Image();
 const backgroundImage = new Image();
 
 let clickedBub = null;
@@ -20,7 +19,7 @@ class Block {
 	pos;
 	dim;
 	borderRadius;
-	constructor(pos, dim, borderRadius = 10) {
+	constructor(pos, dim, borderRadius = 5) {
 		this.pos = pos;
 		this.dim = dim;
 		this.borderRadius = borderRadius;
@@ -87,8 +86,10 @@ class Bubble {
 	}
 	// Unnecessary code copying from collision resolution (TODO: fix)
 	isCollidingBlock(block) {
-		const borderRadius = block.borderRadius || 10;
+		const borderRadius = block.borderRadius;
 		let collisionDetected = false;
+		let normal = new Vector(0, 0);
+		let penetrationDepth = 0;
 
 		// Check collision with rectangle edges (excluding corners)
 		const px = Math.max(
@@ -101,6 +102,23 @@ class Bubble {
 		);
 		const collisionPoint = new Vector(px, py);
 		const dist = this.pos.sub(collisionPoint).length();
+
+		if (dist <= this.radius) {
+			collisionDetected = true;
+
+			// Determine the collision normal for edges
+			if (px === block.pos.x + borderRadius) {
+				normal = new Vector(-1, 0); // Left edge
+			} else if (px === block.pos.x + block.dim.x - borderRadius) {
+				normal = new Vector(1, 0); // Right edge
+			} else if (py === block.pos.y + borderRadius) {
+				normal = new Vector(0, -1); // Top edge
+			} else if (py === block.pos.y + block.dim.y - borderRadius) {
+				normal = new Vector(0, 1); // Bottom edge
+			}
+
+			penetrationDepth = this.radius - dist;
+		}
 
 		// Check collision with rectangle corners
 		const corners = [
@@ -123,13 +141,17 @@ class Bubble {
 			const cornerDist = this.pos.sub(corner).length();
 			if (cornerDist <= this.radius + borderRadius) {
 				collisionDetected = true;
+				normal = this.pos.sub(corner).normalize();
+				penetrationDepth = this.radius + borderRadius - cornerDist;
 				break;
 			}
 		}
+
 		return collisionDetected;
 	}
+	//BUG: collision with sides is offset by borderRadius (especially visible with a high borderRadius)
 	collideBlock(block) {
-		const borderRadius = block.borderRadius || 10;
+		const borderRadius = block.borderRadius;
 		let collisionDetected = false;
 		let normal = new Vector(0, 0);
 		let penetrationDepth = 0;
@@ -207,7 +229,6 @@ class Bubble {
 		const minDistance = this.radius + other.radius;
 		const distance = vec.length();
 		if (distance <= minDistance) {
-			// console.log("BEFORE:",this.kineticEnergy()+other.kineticEnergy())
 			//my collision sucked so chatGPT wrote this
 			const collisionNormal = vec.normalize();
 
@@ -229,7 +250,6 @@ class Bubble {
 			const separation = collisionNormal.mult(overlap / 2);
 			this.pos = this.pos.add(separation);
 			other.pos = other.pos.sub(separation);
-			// console.log("AFTER:",this.kineticEnergy()+other.kineticEnergy())
 
 			//Eye candy
 			const rotDiff = velocityChange
@@ -239,53 +259,9 @@ class Bubble {
 			other.rotSpeed = rotDiff / 100;
 		}
 	}
-	// A physics experiment gone wrong...
-	collidePhysicsVersion(other) {
-		let vec = this.pos.sub(other.pos);
-		const distance = vec.length();
-		const minDistance = this.radius + other.radius;
-		vec = vec.normalize();
-		if (distance <= minDistance) {
-			const M = other.mass() / this.mass();
-			if (Math.abs(vec.x) < Math.abs(vec.y)) {
-				const R = -vec.x / vec.y;
-				const iM = 1 / M;
-				const iR = 1 / R;
 
-				const c1 = this.velocity.x + M * other.velocity.x;
-				const c2 = this.velocity.y + M * other.velocity.y;
-				const c3 = this.velocity.x - R * this.velocity.y;
-				const c4 = other.velocity.x - R * other.velocity.y;
-
-				const v1 = 0.5 * (c1 - R * c2 - M * c3 + c4);
-				const v2 = 0.5 * (-iR * c1 + c2 + M * iR * c3 + iR * c4);
-				const u1 = 0.5 * (iM * c1 + R * iM * c2 + c3 - iM * c4);
-				const u2 = 0.5 * (iM * iR * c1 + iM * c2 - iR * c3 - iM * iR * c4);
-
-				this.velocity = new Vector(v1, v2);
-				other.velocity = new Vector(u1, u2);
-			} else {
-				const R = -vec.y / vec.x;
-				const iM = 1 / M;
-				const iR = 1 / R;
-
-				const c1 = this.velocity.y + M * other.velocity.y;
-				const c2 = this.velocity.x + M * other.velocity.x;
-				const c3 = this.velocity.y - R * this.velocity.x;
-				const c4 = other.velocity.y - R * other.velocity.x;
-
-				const v1 = 0.5 * (c1 - R * c2 - M * c3 + c4);
-				const v2 = 0.5 * (-c1 + R * c2 + M * c3 + c4) * iR;
-				const u1 = 0.5 * (iM * c1 + R * iM * c2 + c3 - iM * c4);
-				const u2 = 0.5 * (iM * c1 + iM * R * c2 - c3 - iM * c4) * iR;
-
-				this.velocity = new Vector(v1, v2);
-				other.velocity = new Vector(u1, u2);
-			}
-		}
-	}
 	update() {
-		this.bounce();
+		// this.bounce();
 		this.velocity.y += gravity * this.mass();
 		this.velocity = this.velocity.mult(drag);
 		this.rotSpeed *= drag;
@@ -357,28 +333,37 @@ function drawRoundedRect(x, y, width, height, borderRadius) {
 	ctx.stroke();
 	ctx.fill();
 }
-function init() {
-	resizeCanvas();
-	ballSprite.src = "./ball_sprite.png";
-	backgroundImage.src = "./bliss.jpg";
+function prepareBoard() {
+	const sideBlockDim = new Vector(50, 700);
 	blocks.push(
 		new Block(
-			new Vector(canvas.width / 2, canvas.height / 2),
-			new Vector(500, 500),
-			200,
+			new Vector(sideBlockDim.x / 5, (canvas.height - sideBlockDim.y) / 2),
+			sideBlockDim.mult(1),
 		),
 	);
+	blocks.push(
+		new Block(
+			new Vector(
+				canvas.width - sideBlockDim.x / 5 - sideBlockDim.x,
+				(canvas.height - sideBlockDim.y) / 2,
+			),
+			sideBlockDim.mult(1),
+		),
+	);
+}
+function init() {
+	resizeCanvas();
+	backgroundImage.src = "./bliss.jpg";
 	for (let i = 0; i <= 10; i++) {
 		bubbles.push(new Bubble(new Vector(40, 40), 50, new Vector()));
 	}
+	prepareBoard();
 }
 
+// Called when resizing but currently static
 function resizeCanvas() {
-	const screenWidth = window.innerWidth;
-	const screenHeight = window.innerHeight;
-
 	canvas.height = 1600;
-	canvas.width = 900;
+	canvas.width = 950;
 }
 // Generic update func, handles collision
 function update(tFrame) {
