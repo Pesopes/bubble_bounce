@@ -33,14 +33,14 @@ class Block {
 		return pos.add(dim.div(2));
 	}
 	render(ctx) {
-		ctx.fillStyle = "white";
+		ctx.fillStyle = "F0EBE3";
 		drawRoundedRect(
 			ctx,
 			this.pos.x,
 			this.pos.y,
 			this.dim.x,
 			this.dim.y,
-			this.borderRadius,
+			this.borderRadius + 15,
 		);
 	}
 }
