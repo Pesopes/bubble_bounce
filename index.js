@@ -7,7 +7,7 @@ const offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height);
 const offCtx = offscreenCanvas.getContext("2d", { alpha: false });
 let mousePos = new Vector();
 
-const bubbles = [];
+let bubbles = [];
 const blocks = [];
 
 let renderLinesBetween = true;
@@ -17,6 +17,14 @@ const drag = 0.99;
 const damping = 0.99;
 const backgroundImage = new Image();
 
+//determines how far it will spawn the balls based on the top/bottom border
+const distanceFromSide = 300;
+
+const bigBallSize = 75;
+const mediumBallSize = 50;
+const smallBallSize = 37;
+
+const availableSprites = Array.from(new Array(32), (x, i) => i + 1);
 backgroundImage.src = "./abstract_dots.svg";
 let clickedBub = null;
 
@@ -52,16 +60,19 @@ class Bubble {
 	sprite;
 	rotSpeed;
 	rot;
-	constructor(pos, radius, velocity, spriteSrc) {
+	player;
+	bouncedOffWall;
+	constructor(pos, radius, velocity, spriteSrc, player = 0) {
 		this.pos = pos;
 		this.radius = radius;
 		this.velocity = velocity;
 		this.sprite = new Image();
 		this.sprite.src = spriteSrc || "./balls/1.png";
 		this.rotSpeed = 0;
+		this.player = player;
 	}
 	mass() {
-		return (Math.PI * this.radius * this.radius) / 1000000;
+		return (Math.PI * this.radius * this.radius) / 100;
 	}
 	kineticEnergy() {
 		return (this.mass() / 2) * this.velocity.squared();
@@ -83,6 +94,19 @@ class Bubble {
 			this.velocity.y *= -damping;
 			this.pos.y = canvas.height - this.radius;
 		}
+	}
+	outOfBounds() {
+		const safeDistance = this.radius + this.radius / 3;
+		if (
+			this.pos.x - this.radius + safeDistance <= 0 ||
+			this.pos.x + this.radius - safeDistance >= canvas.width ||
+			this.pos.y - this.radius + safeDistance <= 0 ||
+			this.pos.y + this.radius - safeDistance >= canvas.height
+		) {
+			//TODO: death animation
+			return true;
+		}
+		return false;
 	}
 	isCollidingBubble(other) {
 		const vec = this.pos.sub(other.pos);
@@ -228,6 +252,8 @@ class Bubble {
 
 			// Optionally, apply a damping factor to simultate energy loss
 			this.velocity = this.velocity.mult(damping);
+
+			this.bouncedOffWall = true;
 		}
 	}
 	collideBubble(other) {
@@ -294,6 +320,19 @@ class Bubble {
 	}
 }
 
+const isColliding = (testBub) => {
+	for (const block of blocks) {
+		if (testBub.isCollidingBlock(block)) {
+			return true;
+		}
+	}
+	for (const bubble of bubbles) {
+		if (testBub.isCollidingBubble(bubble)) {
+			return true;
+		}
+	}
+	return false;
+};
 function drawImage(ctx, img, pos, scale, rotation) {
 	ctx.save();
 	ctx.translate(pos.x, pos.y);
@@ -396,13 +435,77 @@ function prepareOffscreenCanvas() {
 	}
 	// const offscreen = canvas.transferControlToOffscreen();
 }
+function spawnPlayerBalls(
+	center,
+	playerSprite,
+	playerNum,
+	top,
+	smallCount = 10,
+) {
+	//converts bool to int
+	const side = +top * 2 - 1;
+	const newBub = new Bubble(
+		center,
+		bigBallSize,
+		new Vector(),
+		playerSprite,
+		playerNum,
+	);
+	bubbles.push(newBub);
+	// Medium balls in front of big one
+	for (i = 0; i <= 5; i++) {
+		bubbles.push(
+			new Bubble(
+				new Vector(
+					(i / 5) * canvas.width,
+					center.y + (distanceFromSide / 2) * side,
+				),
+				mediumBallSize,
+				new Vector(),
+				playerSprite,
+				playerNum,
+			),
+		);
+	}
+	// random small ones
+	const iterMax = 100;
+	let iterCount = 0;
+	let iterAll = 0;
+	while (iterCount <= smallCount && iterAll < iterMax) {
+		const newSmallBub = new Bubble(
+			new Vector(
+				smallBallSize + Math.random() * (canvas.width - smallBallSize * 2),
+				center.y - (distanceFromSide / 2) * side * Math.random(),
+			),
+			smallBallSize,
+			new Vector(),
+			playerSprite,
+			playerNum,
+		);
+		if (!isColliding(newSmallBub)) {
+			iterCount++;
+			console.log("AY");
+			bubbles.push(newSmallBub);
+		}
+		iterAll++;
+	}
+}
 function init() {
 	resizeCanvas();
-	for (let i = 0; i <= 10; i++) {
-		bubbles.push(new Bubble(new Vector(300, 200), 50, new Vector()));
-	}
 	prepareBoard();
-	// prepareOffscreenCanvas();
+
+	const topPlayerCenter = new Vector(canvas.width / 2, distanceFromSide);
+	const bottomPlayerCenter = new Vector(
+		canvas.width / 2,
+		canvas.height - distanceFromSide,
+	);
+	const p1 =
+		availableSprites[Math.floor(Math.random() * availableSprites.length)];
+	const p2 = availableSprites.filter((n) => n !== p1)[
+		Math.floor(Math.random() * availableSprites.length)
+	];
+	spawnPlayerBalls(topPlayerCenter, `./balls/${p1}.png`, 1, true);
+	spawnPlayerBalls(bottomPlayerCenter, `./balls/${p2}.png`, 2, false);
 }
 
 // Called when resizing but currently static
@@ -412,6 +515,7 @@ function resizeCanvas() {
 }
 // Generic update func, handles collision
 function update(tFrame) {
+	bubbles = bubbles.filter((b) => !b.outOfBounds());
 	bubbles.forEach((b1, i) => {
 		b1.update();
 		for (const b2 of bubbles.slice(i + 1)) {
@@ -432,19 +536,25 @@ function render(ctx) {
 
 	// Lines between near bubbles
 	if (renderLinesBetween) {
-		bubbles.forEach((b1, i) => {
-			for (const b2 of bubbles.slice(i + 1)) {
-				const maxDistance = 400;
-				const distance = b1.pos.sub(b2.pos).length();
-				if (distance > maxDistance) return;
-				ctx.beginPath();
-				ctx.strokeStyle = `rgba(0, 0, 0, ${1 - distance / maxDistance})`;
-				ctx.lineWidth = 1;
-				ctx.moveTo(b1.pos.x, b1.pos.y);
-				ctx.lineTo(b2.pos.x, b2.pos.y);
-				ctx.stroke();
-			}
-		});
+		for (pn = 1; pn <= 2; pn++) {
+			bubbles
+				.filter((b) => b.player === pn)
+				.forEach((b1, i) => {
+					for (const b2 of bubbles
+						.filter((b) => b.player === pn)
+						.slice(i + 1)) {
+						const maxDistance = 600;
+						const distance = b1.pos.sub(b2.pos).length();
+						if (distance > maxDistance) return;
+						ctx.beginPath();
+						ctx.strokeStyle = `rgba(0, 0, 0, ${1 - distance / maxDistance})`;
+						ctx.lineWidth = 2;
+						ctx.moveTo(b1.pos.x, b1.pos.y);
+						ctx.lineTo(b2.pos.x, b2.pos.y);
+						ctx.stroke();
+					}
+				});
+		}
 	}
 
 	// render objects using their functions
@@ -549,6 +659,9 @@ document.addEventListener("pointerup", (e) => {
 			.normalize()
 			.mult(Math.min(dirVec.length(), maxVelocity));
 		clickedBub = null;
+		// if (dirVec.length() >= maxVelocity) {
+		// 	console.log("MAXIMUM POWER");
+		// }
 	}
 });
 document.addEventListener("keydown", (e) => {
