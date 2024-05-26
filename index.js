@@ -3,11 +3,14 @@
 const canvas = document.getElementById("main-canvas");
 const ctx = canvas.getContext("2d");
 
+const worker = new Worker("worker.js");
+const offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height);
 let mousePos = new Vector();
 
 const bubbles = [];
 const blocks = [];
 
+let chargeDir = -1;
 const gravity = 0.0;
 const drag = 0.99;
 const damping = 0.99;
@@ -27,9 +30,10 @@ class Block {
 	getCenter() {
 		return pos.add(dim.div(2));
 	}
-	render() {
+	render(ctx) {
 		ctx.fillStyle = "white";
 		drawRoundedRect(
+			ctx,
 			this.pos.x,
 			this.pos.y,
 			this.dim.x,
@@ -269,17 +273,17 @@ class Bubble {
 		this.pos = this.pos.add(this.velocity);
 	}
 
-	render() {
+	render(ctx) {
 		//TODO: color
-		// drawCircle(this.pos, this.radius)
+		// drawCircle(ctx,this.pos, this.radius)
 		ctx.fillStyle = "rgb(200 0 0)";
 		this.rot = this.rot || Math.PI * 2 * Math.random();
-		drawImage(this.sprite, this.pos, this.radius * 2, this.rot);
+		drawImage(ctx, this.sprite, this.pos, this.radius * 2, this.rot);
 	}
 
-	simpleRender() {
+	simpleRender(ctx) {
 		ctx.fillStyle = "blue";
-		drawCircle(this.pos, this.radius);
+		drawCircle(ctx, this.pos, this.radius);
 	}
 
 	isInside(pos) {
@@ -288,7 +292,7 @@ class Bubble {
 	}
 }
 
-function drawImage(img, pos, scale, rotation) {
+function drawImage(ctx, img, pos, scale, rotation) {
 	ctx.save();
 	ctx.translate(pos.x, pos.y);
 	ctx.rotate(rotation);
@@ -296,13 +300,13 @@ function drawImage(img, pos, scale, rotation) {
 	ctx.restore();
 }
 
-function drawCircle(pos, radius) {
+function drawCircle(ctx, pos, radius) {
 	ctx.beginPath();
 	ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
 	ctx.fill();
 }
 
-function drawRoundedRect(x, y, width, height, borderRadius) {
+function drawRoundedRect(ctx, x, y, width, height, borderRadius) {
 	// Begin path
 	ctx.strokeStyle = "rgba(0, 0, 0, 1.0)";
 	ctx.lineWidth = 6;
@@ -363,13 +367,34 @@ function prepareBoard() {
 		),
 	);
 }
+// TODO: finish
+function prepareOffscreenCanvas() {
+	offscreenCanvas.width = canvas.width;
+	offscreenCanvas.height = canvas.height;
+
+	backgroundImage.src = "./bliss.jpg";
+	const offCtx = offscreenCanvas.getContext("2d");
+	console.log(offscreenCanvas);
+
+	offCtx.drawImage(
+		backgroundImage,
+		0,
+		0,
+		offscreenCanvas.width,
+		offscreenCanvas.height,
+	);
+	for (const block of blocks) {
+		block.render(offCtx);
+	}
+	// const offscreen = canvas.transferControlToOffscreen();
+}
 function init() {
 	resizeCanvas();
-	// backgroundImage.src = "./abstract_dots_2.svg";
 	for (let i = 0; i <= 10; i++) {
-		bubbles.push(new Bubble(new Vector(40, 40), 50, new Vector()));
+		bubbles.push(new Bubble(new Vector(300, 200), 50, new Vector()));
 	}
 	prepareBoard();
+	prepareOffscreenCanvas();
 }
 
 // Called when resizing but currently static
@@ -390,12 +415,12 @@ function update(tFrame) {
 	});
 }
 // Handles rendering of all objects and other stuff like the charge up lines
-function render() {
+function render(ctx) {
 	// Reset screen
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
-	ctx.fillStyle = "#ffa3ff";
-	ctx.fillRect(0, 0, canvas.width, canvas.height);
 	// ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+
+	ctx.drawImage(offscreenCanvas, 0, 0);
 
 	// Lines between near bubbles
 	bubbles.forEach((b1, i) => {
@@ -413,11 +438,8 @@ function render() {
 	});
 
 	// render objects using their functions
-	for (const block of blocks) {
-		block.render();
-	}
 	for (bub of bubbles) {
-		bub.render();
+		bub.render(ctx);
 	}
 
 	// Dragging line and hit indicator
@@ -426,7 +448,7 @@ function render() {
 		// const end = bubPos.add(bubPos.sub(mousePos))
 		const maxRaycast = new Vector(canvas.width, canvas.height).length();
 		const raycastEnd = bubPos.add(
-			bubPos.sub(mousePos).normalize().mult(maxRaycast),
+			bubPos.sub(mousePos).mult(chargeDir).normalize().mult(maxRaycast),
 		);
 		const raycastHit = raycastSphere(
 			bubPos,
@@ -437,9 +459,9 @@ function render() {
 		);
 		if (raycastHit) {
 			ctx.fillStyle = "blue";
-			drawCircle(raycastHit, clickedBub.radius);
+			drawCircle(ctx, raycastHit, clickedBub.radius);
 		}
-		end = bubPos.add(bubPos.sub(mousePos));
+		end = bubPos.add(bubPos.sub(mousePos).mult(chargeDir));
 		ctx.beginPath();
 		ctx.strokeStyle = "rgb(0 0 0)";
 		ctx.lineWidth = 6;
@@ -512,7 +534,7 @@ document.addEventListener("pointerup", (e) => {
 
 	if (clickedBub) {
 		const maxVelocity = 18;
-		const dirVec = clickedBub.pos.sub(mousePos).div(16);
+		const dirVec = clickedBub.pos.sub(mousePos).div(16).mult(chargeDir);
 		clickedBub.velocity = dirVec
 			.normalize()
 			.mult(Math.min(dirVec.length(), maxVelocity));
@@ -531,7 +553,7 @@ document.addEventListener("keydown", (e) => {
 		window.requestAnimationFrame(main);
 
 		update(tFrame);
-		render();
+		render(ctx);
 	}
 
 	main();
