@@ -1,21 +1,23 @@
 // bublinky různé velikosti, kliknutí se rozpadnou na menší
 
 const canvas = document.getElementById("main-canvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d", { alpha: false });
 
-const worker = new Worker("worker.js");
 const offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height);
+const offCtx = offscreenCanvas.getContext("2d", { alpha: false });
 let mousePos = new Vector();
 
 const bubbles = [];
 const blocks = [];
 
+let renderLinesBetween = true;
 let chargeDir = -1;
 const gravity = 0.0;
 const drag = 0.99;
 const damping = 0.99;
 const backgroundImage = new Image();
 
+backgroundImage.src = "./abstract_dots.svg";
 let clickedBub = null;
 
 class Block {
@@ -255,7 +257,7 @@ class Bubble {
 			this.pos = this.pos.add(separation);
 			other.pos = other.pos.sub(separation);
 
-			//Eye candy
+			//Eye candy - rotation
 			const rotDiff = velocityChange
 				.normalize()
 				.dot(new Vector(-this.velocity.y, this.velocity.x).normalize());
@@ -276,7 +278,7 @@ class Bubble {
 	render(ctx) {
 		//TODO: color
 		// drawCircle(ctx,this.pos, this.radius)
-		ctx.fillStyle = "rgb(200 0 0)";
+		// ctx.fillStyle = "rgb(200 0 0)";
 		this.rot = this.rot || Math.PI * 2 * Math.random();
 		drawImage(ctx, this.sprite, this.pos, this.radius * 2, this.rot);
 	}
@@ -337,6 +339,7 @@ function drawRoundedRect(ctx, x, y, width, height, borderRadius) {
 	ctx.stroke();
 	ctx.fill();
 }
+
 function prepareBoard() {
 	const sideBlockDim = new Vector(50, 700);
 	const sideBlockOffset = sideBlockDim.x / 5;
@@ -367,22 +370,27 @@ function prepareBoard() {
 		),
 	);
 }
+backgroundImage.onload = (e) => {
+	prepareOffscreenCanvas();
+};
 // TODO: finish
 function prepareOffscreenCanvas() {
 	offscreenCanvas.width = canvas.width;
 	offscreenCanvas.height = canvas.height;
-
-	backgroundImage.src = "./bliss.jpg";
-	const offCtx = offscreenCanvas.getContext("2d");
-	console.log(offscreenCanvas);
-
+	offCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+	offCtx.fillStyle = "#efe1e1";
+	offCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+	offCtx.save();
+	offCtx.filter = "drop-shadow(4px 4px 5px black) brightness(0.1) opacity(10%)";
+	offCtx.scale(2, 2);
 	offCtx.drawImage(
 		backgroundImage,
 		0,
 		0,
-		offscreenCanvas.width,
-		offscreenCanvas.height,
+		backgroundImage.width,
+		backgroundImage.height,
 	);
+	offCtx.restore();
 	for (const block of blocks) {
 		block.render(offCtx);
 	}
@@ -394,7 +402,7 @@ function init() {
 		bubbles.push(new Bubble(new Vector(300, 200), 50, new Vector()));
 	}
 	prepareBoard();
-	prepareOffscreenCanvas();
+	// prepareOffscreenCanvas();
 }
 
 // Called when resizing but currently static
@@ -423,19 +431,21 @@ function render(ctx) {
 	ctx.drawImage(offscreenCanvas, 0, 0);
 
 	// Lines between near bubbles
-	bubbles.forEach((b1, i) => {
-		for (b2 of bubbles.slice(i + 1)) {
-			const maxDistance = 400;
-			const distance = b1.pos.sub(b2.pos).length();
-			if (distance > maxDistance) return;
-			ctx.beginPath();
-			ctx.strokeStyle = `rgba(0, 0, 0, ${1 - distance / maxDistance})`;
-			ctx.lineWidth = 1;
-			ctx.moveTo(b1.pos.x, b1.pos.y);
-			ctx.lineTo(b2.pos.x, b2.pos.y);
-			ctx.stroke();
-		}
-	});
+	if (renderLinesBetween) {
+		bubbles.forEach((b1, i) => {
+			for (const b2 of bubbles.slice(i + 1)) {
+				const maxDistance = 400;
+				const distance = b1.pos.sub(b2.pos).length();
+				if (distance > maxDistance) return;
+				ctx.beginPath();
+				ctx.strokeStyle = `rgba(0, 0, 0, ${1 - distance / maxDistance})`;
+				ctx.lineWidth = 1;
+				ctx.moveTo(b1.pos.x, b1.pos.y);
+				ctx.lineTo(b2.pos.x, b2.pos.y);
+				ctx.stroke();
+			}
+		});
+	}
 
 	// render objects using their functions
 	for (bub of bubbles) {
