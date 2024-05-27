@@ -402,7 +402,7 @@ function prepareBoard() {
 	// Spawn mid blocks
 	const blockCount = Math.round(Math.random()) + 1;
 	if (blockCount === 1) {
-		const size = 230 + 80 * Math.random();
+		const size = 230 + 170 * Math.random();
 		const midBlockPos = new Vector(
 			sideBlockOffset +
 				sideBlockDim.x +
@@ -580,24 +580,22 @@ function render(ctx) {
 
 	// Lines between near bubbles
 	if (renderLinesBetween) {
+		const maxDistance = 600;
 		for (pn = 1; pn <= 2; pn++) {
-			bubbles
-				.filter((b) => b.player === pn)
-				.forEach((b1, i) => {
-					for (const b2 of bubbles
-						.filter((b) => b.player === pn)
-						.slice(i + 1)) {
-						const maxDistance = 600;
-						const distance = b1.pos.sub(b2.pos).length();
-						if (distance > maxDistance) return;
+			const playerBubbles = bubbles.filter((b) => b.player === pn);
+			playerBubbles.forEach((b1, i) => {
+				for (const b2 of playerBubbles.slice(i + 1)) {
+					const distance = b1.pos.sub(b2.pos).length();
+					if (distance <= maxDistance) {
 						ctx.beginPath();
 						ctx.strokeStyle = `rgba(0, 0, 0, ${1 - distance / maxDistance})`;
-						ctx.lineWidth = 2;
+						ctx.lineWidth = 1;
 						ctx.moveTo(Math.floor(b1.pos.x), Math.floor(b1.pos.y));
 						ctx.lineTo(Math.floor(b2.pos.x), Math.floor(b2.pos.y));
 						ctx.stroke();
 					}
-				});
+				}
+			});
 		}
 	}
 
