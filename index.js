@@ -633,8 +633,10 @@ function update(tFrame) {
 	});
 	//no movement => other player can play
 	if (allStopped()) {
-		for (const bubble of bubbles) {
-			bubble.velocity = new Vector();
+		for (i = 0; i < 1000; i++) {
+			for (const bubble of bubbles) {
+				bubble.update();
+			}
 		}
 		isWaiting = false;
 		//win checking
