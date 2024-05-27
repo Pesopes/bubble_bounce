@@ -10,19 +10,23 @@ let mousePos = new Vector();
 let bubbles = [];
 const blocks = [];
 
+//gameplay settings
+let enableMiddleBlocks = true;
+
+//visual settings
 let renderLinesBetween = true;
 let chargeDir = -1;
-const gravity = 0.0;
-const drag = 0.99;
-const damping = 0.99;
-const backgroundImage = new Image();
-
-//determines how far it will spawn the balls based on the top/bottom border
-const distanceFromSide = 300;
 
 const bigBallSize = 75;
 const mediumBallSize = 50;
 const smallBallSize = 37;
+//game engine settings
+const gravity = 0.0;
+const drag = 0.99;
+const damping = 0.99;
+const backgroundImage = new Image();
+//determines how far it will spawn the balls based on the top/bottom border
+const distanceFromSide = 300;
 
 const availableSprites = Array.from(new Array(32), (x, i) => i + 1);
 backgroundImage.src = "./abstract_dots.svg";
@@ -395,31 +399,62 @@ function prepareBoard() {
 	);
 	blocks.push(new Block(rightBlockPos, sideBlockDim.mult(1)));
 
-	const midBlockPos = new Vector(
-		sideBlockOffset +
-			sideBlockDim.x +
-			Math.random() * (canvas.width - 2 * (sideBlockOffset - sideBlockDim.x)),
-		(canvas.height - sideBlockDim.x) / 2,
-	);
-
 	// Spawn mid blocks
-	blocks.push(
-		new Block(
-			midBlockPos,
-			new Vector(rightBlockPos.x - midBlockPos.x, sideBlockDim.x),
-		),
-	);
+	const blockCount = Math.round(Math.random()) + 1;
+	if (blockCount === 1) {
+		const size = 230 + 80 * Math.random();
+		const midBlockPos = new Vector(
+			sideBlockOffset +
+				sideBlockDim.x +
+				Math.random() *
+					(canvas.width - size - 2 * (sideBlockOffset + sideBlockDim.x)),
+			(canvas.height - sideBlockDim.x) / 2,
+		);
+		blocks.push(new Block(midBlockPos, new Vector(size, sideBlockDim.x)));
+	} else if (blockCount === 2) {
+		const size1 = 170 + 80 * Math.random();
+		const size2 = 100 + 50 * Math.random();
+		const firstMidBlockPos = new Vector(
+			sideBlockOffset +
+				sideBlockDim.x +
+				Math.random() *
+					(canvas.width -
+						size1 -
+						size2 -
+						2 * (sideBlockOffset + sideBlockDim.x)),
+			(canvas.height - sideBlockDim.x) / 2,
+		);
+		const secondMidBlockPos = new Vector(
+			firstMidBlockPos.x +
+				size1 +
+				Math.random() *
+					(canvas.width -
+						size1 -
+						size2 -
+						firstMidBlockPos.x -
+						sideBlockOffset -
+						sideBlockDim.x),
+			(canvas.height - sideBlockDim.x) / 2,
+		);
+		blocks.push(new Block(firstMidBlockPos, new Vector(size1, sideBlockDim.x)));
+		blocks.push(
+			new Block(secondMidBlockPos, new Vector(size2, sideBlockDim.x)),
+		);
+	}
 }
 backgroundImage.onload = (e) => {
 	prepareOffscreenCanvas();
 };
 // TODO: finish
 function prepareOffscreenCanvas() {
+	// set same dimensions
 	offscreenCanvas.width = canvas.width;
 	offscreenCanvas.height = canvas.height;
+	//clear with colour
 	offCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
 	offCtx.fillStyle = "#efe1e1";
 	offCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+	//add background image
 	offCtx.save();
 	offCtx.filter = "drop-shadow(4px 4px 5px black) brightness(0.1) opacity(10%)";
 	offCtx.scale(2, 2);
@@ -431,10 +466,17 @@ function prepareOffscreenCanvas() {
 		backgroundImage.height,
 	);
 	offCtx.restore();
+	// Line in middle
+	offCtx.lineWidth = 3;
+	offCtx.strokeStyle = "rgba(0, 0, 0, 0.4)";
+	offCtx.beginPath();
+	offCtx.moveTo(offscreenCanvas.width / 10, offscreenCanvas.height / 2);
+	offCtx.lineTo((9 * offscreenCanvas.width) / 10, offscreenCanvas.height / 2);
+	offCtx.stroke();
+	//render static blocks
 	for (const block of blocks) {
 		block.render(offCtx);
 	}
-	// const offscreen = canvas.transferControlToOffscreen();
 }
 function spawnPlayerBalls(
 	center,
@@ -492,7 +534,9 @@ function spawnPlayerBalls(
 }
 function init() {
 	resizeCanvas();
-	prepareBoard();
+	if (enableMiddleBlocks) {
+		prepareBoard();
+	}
 
 	const topPlayerCenter = new Vector(canvas.width / 2, distanceFromSide);
 	const bottomPlayerCenter = new Vector(
