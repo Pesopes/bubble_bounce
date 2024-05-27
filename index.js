@@ -385,7 +385,7 @@ function drawRoundedRect(ctx, x, y, width, height, borderRadius) {
 }
 
 function prepareBoard() {
-	const sideBlockDim = new Vector(50, 700);
+	const sideBlockDim = new Vector(30, 700);
 	const sideBlockOffset = sideBlockDim.x / 5;
 	const rightBlockPos = new Vector(
 		canvas.width - sideBlockOffset - sideBlockDim.x,
