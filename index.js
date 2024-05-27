@@ -6,9 +6,15 @@ const ctx = canvas.getContext("2d", { alpha: false });
 const offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height);
 const offCtx = offscreenCanvas.getContext("2d", { alpha: false });
 let mousePos = new Vector();
+let frame = 0;
+let gameEnd = false;
+let winningPlayer = 0;
 
 let bubbles = [];
-const blocks = [];
+let blocks = [];
+
+let currentPlayer = Math.round(Math.random()) + 1;
+let isWaiting = false;
 
 //gameplay settings
 let enableMiddleBlocks = true;
@@ -311,11 +317,20 @@ class Bubble {
 		// drawCircle(ctx,this.pos, this.radius)
 		// ctx.fillStyle = "rgb(200 0 0)";
 		this.rot = this.rot || Math.PI * 2 * Math.random();
+
+		if (this.player === currentPlayer && !isWaiting) {
+			ctx.fillStyle = "rgba(0,0,0,0.3)";
+			drawCircle(
+				ctx,
+				this.pos,
+				this.radius + this.radius * 0.3 * Math.abs(Math.sin(frame / 500)),
+			);
+		}
 		drawImage(ctx, this.sprite, this.pos, this.radius * 2, this.rot);
 	}
 
 	simpleRender(ctx) {
-		ctx.fillStyle = "blue";
+		ctx.fillStyle = color;
 		drawCircle(ctx, this.pos, this.radius);
 	}
 
@@ -551,14 +566,63 @@ function init() {
 	spawnPlayerBalls(topPlayerCenter, `./balls/${p1}.png`, 1, true);
 	spawnPlayerBalls(bottomPlayerCenter, `./balls/${p2}.png`, 2, false);
 }
-
+function resetGame() {
+	gameEnd = false;
+	bubbles = [];
+	blocks = [];
+	currentPlayer = Math.round(Math.random()) + 1;
+	init();
+	prepareOffscreenCanvas();
+}
 // Called when resizing but currently static
 function resizeCanvas() {
 	canvas.height = 1600;
 	canvas.width = 950;
 }
+function winGame(player) {
+	blocks = [];
+	prepareOffscreenCanvas();
+	gameEnd = true;
+	winningPlayer = player;
+}
+function switchPlayer() {
+	if (currentPlayer === 1) {
+		currentPlayer = 2;
+	} else {
+		currentPlayer = 1;
+	}
+}
+const allStopped = () => {
+	for (const bubble of bubbles) {
+		if (bubble.velocity.length() > 0.1) return false;
+	}
+	return true;
+};
+
+const getWinner = () => {
+	let anyPlayer1 = false;
+	let anyPlayer2 = false;
+	for (const bubble of bubbles) {
+		if (bubble.player === 1) {
+			anyPlayer1 = true;
+		} else {
+			anyPlayer2 = true;
+		}
+		if (anyPlayer1 && anyPlayer2) {
+			break;
+		}
+	}
+	if (anyPlayer1 ^ anyPlayer2) {
+		if (anyPlayer1) {
+			return 2;
+		}
+		return 1;
+	}
+	return 0;
+};
 // Generic update func, handles collision
 function update(tFrame) {
+	frame = tFrame;
 	bubbles = bubbles.filter((b) => !b.outOfBounds());
 	bubbles.forEach((b1, i) => {
 		b1.update();
@@ -569,6 +633,19 @@ function update(tFrame) {
 			b1.collideBlock(block);
 		}
 	});
+	//no movement => other player can play
+	if (allStopped()) {
+		isWaiting = false;
+		//win checking
+		if (bubbles.length === 0) {
+			winGame(0);
+		} else {
+			const winner = getWinner();
+			if (winner !== 0) {
+				winGame(winner);
+			}
+		}
+	}
 }
 // Handles rendering of all objects and other stuff like the charge up lines
 function render(ctx) {
@@ -632,7 +709,29 @@ function render(ctx) {
 		ctx.stroke();
 	}
 }
+function renderEnd(ctx) {
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	ctx.drawImage(offscreenCanvas, 0, 0);
 
+	let message = "BRUH";
+	if (winningPlayer === 0) {
+		message = "Draw";
+	} else if (winningPlayer === 1) {
+		message = "Player 1 won!";
+	} else {
+		message = "Player 2 won!";
+	}
+	ctx.fillStyle = "black";
+	ctx.textAlign = "center";
+	ctx.font = 'bold 120px "verdana", sans-serif';
+	ctx.fillText(message, canvas.width / 2, canvas.height / 2);
+	ctx.font = '60px "verdana", sans-serif';
+	ctx.fillText(
+		"Click to continue...",
+		canvas.width / 2,
+		(canvas.height * 2) / 3,
+	);
+}
 function raycastSphere(from, to, radius, exclude, steps = 100) {
 	const dir = to.sub(from);
 	const testBub = new Bubble(new Vector(), radius);
@@ -686,9 +785,18 @@ document.addEventListener("pointermove", (e) => {
 
 // start aiming (saves the clicked bubble)
 document.addEventListener("pointerdown", (e) => {
+	if (gameEnd) {
+		resetGame();
+		return;
+	}
 	mousePos = getMousePos(e);
 
-	clickedBub = get_bubble_in_pos(mousePos);
+	if (!isWaiting) {
+		clickedBub = get_bubble_in_pos(mousePos);
+		if (clickedBub && clickedBub.player !== currentPlayer) {
+			clickedBub = null;
+		}
+	}
 });
 // Stopped aiming -> shoot
 document.addEventListener("pointerup", (e) => {
@@ -701,27 +809,25 @@ document.addEventListener("pointerup", (e) => {
 			.normalize()
 			.mult(Math.min(dirVec.length(), maxVelocity));
 		clickedBub = null;
+		switchPlayer();
+		isWaiting = true;
 		// if (dirVec.length() >= maxVelocity) {
 		// 	console.log("MAXIMUM POWER");
 		// }
 	}
 });
-document.addEventListener("keydown", (e) => {
-	// mousePos = new Vector(e.clientX, e.clientY)
-
-	const newBub = new Bubble(mousePos.mult(1), 40, new Vector());
-	newBub.sprite.src = `./balls/${Math.ceil(Math.random() * 32)}.png`;
-	bubbles.push(newBub);
-});
+init();
 (() => {
 	function main(tFrame) {
 		window.requestAnimationFrame(main);
 
-		update(tFrame);
-		render(ctx);
+		if (!gameEnd) {
+			update(tFrame);
+			render(ctx);
+		} else {
+			renderEnd(ctx);
+		}
 	}
 
 	main();
 })();
-
-init();
