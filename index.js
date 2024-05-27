@@ -594,7 +594,7 @@ function switchPlayer() {
 }
 const allStopped = () => {
 	for (const bubble of bubbles) {
-		if (bubble.velocity.length() > 0.1) return false;
+		if (bubble.velocity.length() > 0.3) return false;
 	}
 	return true;
 };
@@ -635,6 +635,9 @@ function update(tFrame) {
 	});
 	//no movement => other player can play
 	if (allStopped()) {
+		for (const bubble of bubbles) {
+			bubble.velocity = new Vector();
+		}
 		isWaiting = false;
 		//win checking
 		if (bubbles.length === 0) {
