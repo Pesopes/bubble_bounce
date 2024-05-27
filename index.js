@@ -44,8 +44,9 @@ class Block {
 		ctx.fillStyle = "F0EBE3";
 		drawRoundedRect(
 			ctx,
-			this.pos.x,
-			this.pos.y,
+			// Optimize
+			Math.floor(this.pos.x),
+			Math.floor(this.pos.y),
 			this.dim.x,
 			this.dim.y,
 			this.borderRadius + 15,
@@ -335,7 +336,7 @@ const isColliding = (testBub) => {
 };
 function drawImage(ctx, img, pos, scale, rotation) {
 	ctx.save();
-	ctx.translate(pos.x, pos.y);
+	ctx.translate(Math.floor(pos.x), Math.floor(pos.y));
 	ctx.rotate(rotation);
 	ctx.drawImage(img, -scale / 2, -scale / 2, scale, scale);
 	ctx.restore();
@@ -343,7 +344,7 @@ function drawImage(ctx, img, pos, scale, rotation) {
 
 function drawCircle(ctx, pos, radius) {
 	ctx.beginPath();
-	ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+	ctx.arc(Math.floor(pos.x), Math.floor(pos.y), radius, 0, Math.PI * 2);
 	ctx.fill();
 }
 
@@ -484,7 +485,6 @@ function spawnPlayerBalls(
 		);
 		if (!isColliding(newSmallBub)) {
 			iterCount++;
-			console.log("AY");
 			bubbles.push(newSmallBub);
 		}
 		iterAll++;
@@ -549,8 +549,8 @@ function render(ctx) {
 						ctx.beginPath();
 						ctx.strokeStyle = `rgba(0, 0, 0, ${1 - distance / maxDistance})`;
 						ctx.lineWidth = 2;
-						ctx.moveTo(b1.pos.x, b1.pos.y);
-						ctx.lineTo(b2.pos.x, b2.pos.y);
+						ctx.moveTo(Math.floor(b1.pos.x), Math.floor(b1.pos.y));
+						ctx.lineTo(Math.floor(b2.pos.x), Math.floor(b2.pos.y));
 						ctx.stroke();
 					}
 				});
