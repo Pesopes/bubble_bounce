@@ -5,6 +5,11 @@ const offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height);
 const offCtx = offscreenCanvas.getContext("2d", { alpha: false });
 let mousePos = new Vector();
 let frame = 0;
+
+let evCache = [];
+let previousEvDistance = -1;
+let startingTouchCenter = new Vector();
+
 let gameEnd = false;
 let winningPlayer = 0;
 
@@ -16,6 +21,7 @@ let isWaiting = false;
 
 //gameplay settings
 let enableMiddleBlocks = true;
+let requieredBounce = false;
 
 //visual settings
 let renderLinesBetween = true;
@@ -26,7 +32,7 @@ const mediumBallSize = 50;
 const smallBallSize = 37;
 //game engine settings
 const gravity = 0.0;
-const drag = 0.99;
+const drag = 0.988;
 const damping = 0.99;
 const backgroundImage = new Image();
 //determines how far it will spawn the balls based on the top/bottom border
@@ -792,6 +798,12 @@ document.addEventListener("pointerdown", (e) => {
 		resetGame();
 		return;
 	}
+	evCache.push(e);
+	if (evCache.length === 2) {
+		startingTouchCenter = getMousePos(evCache[0]).add(
+			getMousePos(evCache[1]).sub(getMousePos(evCache[0])).div(2),
+		);
+	}
 	mousePos = getMousePos(e);
 
 	if (!isWaiting) {
@@ -801,10 +813,20 @@ document.addEventListener("pointerdown", (e) => {
 		}
 	}
 });
+function removeEvent(ev) {
+	// Remove this event from the target's cache
+	const index = evCache.findIndex(
+		(cachedEv) => cachedEv.pointerId === ev.pointerId,
+	);
+	evCache.splice(index, 1);
+}
 // Stopped aiming -> shoot
 document.addEventListener("pointerup", (e) => {
 	mousePos = getMousePos(e);
-
+	removeEvent(e);
+	if (evCache.length < 2) {
+		previousEvDistance = -1;
+	}
 	if (clickedBub) {
 		const maxVelocity = 18;
 		const dirVec = clickedBub.pos.sub(mousePos).div(16).mult(chargeDir);
@@ -817,6 +839,41 @@ document.addEventListener("pointerup", (e) => {
 		// if (dirVec.length() >= maxVelocity) {
 		// 	console.log("MAXIMUM POWER");
 		// }
+	}
+});
+const zoomIn = () => {
+	canvas.style.transform = "scale(1)";
+};
+const zoomOut = () => {
+	canvas.style.transform = "scale(0.8)";
+};
+document.addEventListener("pointermove", (e) => {
+	const index = evCache.findIndex(
+		(cachedE) => cachedE.pointerId === e.pointerId,
+	);
+	evCache[index] = e;
+	if (evCache.length === 2) {
+		const firstTouch = new Vector(evCache[0].clientX, evCache[0].clientY);
+		const secondTouch = new Vector(evCache[1].clientX, evCache[1].clientY);
+		const diff = firstTouch.sub(secondTouch).length();
+		const neededDistance = 13;
+		if (previousEvDistance > 0) {
+			if (diff > previousEvDistance + neededDistance) {
+				zoomIn();
+			}
+
+			if (diff < previousEvDistance - neededDistance) {
+				zoomOut();
+			}
+		}
+		previousEvDistance = diff;
+	}
+});
+document.addEventListener("wheel", (event) => {
+	if (event.deltaY < 0) {
+		zoomIn();
+	} else {
+		zoomOut();
 	}
 });
 init();
