@@ -10,7 +10,7 @@ let evCache = [];
 let previousEvDistance = -1;
 let startingTouchCenter = new Vector();
 
-let gameEnd = false;
+let gameState = 0
 let winningPlayer = 0;
 
 let bubbles = [];
@@ -67,7 +67,41 @@ class Block {
 		);
 	}
 }
+class Button{
+	pos;
+	dim;
+	onClick;
+	text;
+	color;
+	constructor(pos,dim,text,onClick,color="red"){
+		this.pos = pos
+		this.dim =dim
+		this.text= text
+		this.onClick = onClick
+		this.color = color
+	}
+	isInside(pos){
+		return (pos.x>=this.pos.x&&this.pos.x<=this.pos.x+this.dim.x&&pos.y>=this.pos.y&&this.pos.y<=this.pos.y+this.dim.y)
+	}
+	checkClick(pos=mousePos){
+		if(this.isInside(pos)){
+			this.onClick()
+		}
+	}
+	render(ctx){
+		ctx.fillStyle = this.color;
+		drawRoundedRect(
+			ctx,
+			// Optimize
+			Math.floor(this.pos.x),
+			Math.floor(this.pos.y),
+			this.dim.x,
+			this.dim.y,
+			15,
+		);
 
+	}
+}
 class Bubble {
 	pos;
 	radius;
@@ -571,7 +605,7 @@ function init() {
 	spawnPlayerBalls(bottomPlayerCenter, `./balls/${p2}.png`, 2, false);
 }
 function resetGame() {
-	gameEnd = false;
+	gameState = 0;
 	bubbles = [];
 	blocks = [];
 	currentPlayer = Math.round(Math.random()) + 1;
@@ -586,7 +620,7 @@ function resizeCanvas() {
 function winGame(player) {
 	blocks = [];
 	prepareOffscreenCanvas();
-	gameEnd = true;
+	gameState=1;
 	winningPlayer = player;
 }
 function switchPlayer() {
@@ -722,7 +756,7 @@ function renderEnd(ctx) {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	ctx.drawImage(offscreenCanvas, 0, 0);
 
-	let message = "BRUH";
+	let message = "";
 	if (winningPlayer === 0) {
 		message = "Draw";
 	} else if (winningPlayer === 1) {
@@ -740,6 +774,25 @@ function renderEnd(ctx) {
 		canvas.width / 2,
 		(canvas.height * 2) / 3,
 	);
+}
+let buttons = [new Button(new Vector(10,100),new Vector(100,100),"DHH",()=>console.log("DASDDSA"))]
+function renderStart(ctx){
+
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	ctx.drawImage(offscreenCanvas, 0, 0);
+	buttons[0].render(ctx)
+
+	ctx.fillStyle = "black";
+	ctx.textAlign = "center";
+	ctx.font = 'bold 120px "verdana", sans-serif';
+	ctx.fillText("TEST", canvas.width / 2, canvas.height / 2);
+	ctx.font = '60px "verdana", sans-serif';
+	ctx.fillText(
+		"Click to continue...",
+		canvas.width / 2,
+		(canvas.height * 2) / 3,
+	);
+
 }
 function raycastSphere(from, to, radius, exclude, steps = 100) {
 	const dir = to.sub(from);
@@ -794,7 +847,12 @@ document.addEventListener("pointermove", (e) => {
 
 // start aiming (saves the clicked bubble)
 document.addEventListener("pointerdown", (e) => {
-	if (gameEnd) {
+	if(gameState===0){
+		for (const button of buttons){
+			button.checkClick(getMousePos(e))
+		}
+	}
+	if (gameState===2) {
 		resetGame();
 		return;
 	}
@@ -877,14 +935,18 @@ document.addEventListener("wheel", (event) => {
 	}
 });
 init();
+// The main game loop
 (() => {
 	function main(tFrame) {
 		window.requestAnimationFrame(main);
 
-		if (!gameEnd) {
+		if(gameState===0){
+			renderStart(ctx)
+		}
+		else if (gameState===1) {
 			update(tFrame);
 			render(ctx);
-		} else {
+		} else if (gameState===2){
 			renderEnd(ctx);
 		}
 	}
