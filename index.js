@@ -45,7 +45,7 @@ const gravity = 0.0;
 const drag = 0.992;
 const damping = 0.96;
 
-const fireForce = 21;
+const fireForce = 18;
 
 const backgroundImage = new Image();
 
@@ -999,7 +999,7 @@ function renderStart(ctx) {
 	ctx.fillStyle = "black";
 	ctx.textAlign = "center";
 	ctx.font = 'bold 100px "Helvetica", sans-serif';
-	ctx.fillText("The bubble game", canvas.width / 2, canvas.height / 8);
+	ctx.fillText("Bubble Bounce", canvas.width / 2, canvas.height / 8);
 }
 function randomFromArray(arr) {
 	return arr[Math.floor(Math.random() * arr.length)];
