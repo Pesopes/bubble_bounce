@@ -1,44 +1,57 @@
 const canvas = document.getElementById("main-canvas");
-const ctx = canvas.getContext("2d", { alpha: false });
+const ctx = canvas.getContext("2d");
 
+// Used for background and static objects (meant to improve performance)
 const offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height);
 const offCtx = offscreenCanvas.getContext("2d", { alpha: false });
-let mousePos = new Vector();
-let frame = 0;
 
+// Touch event stuff
+let mousePos = new Vector();
 let evCache = [];
 let previousEvDistance = -1;
 let startingTouchCenter = new Vector();
 
-let gameState = 0
-let winningPlayer = 0;
-
+// Spawned objects
 let bubbles = [];
 let blocks = [];
+let buttons = [];
+let previewBubbles = [];
 
+// game state
+let frame = 0;
+let gameState = 0;
+let winningPlayer = 0;
 let currentPlayer = Math.round(Math.random()) + 1;
 let isWaiting = false;
 
-//gameplay settings
+// Gameplay settings
 let enableMiddleBlocks = true;
-let requieredBounce = false;
-
-//visual settings
-let renderLinesBetween = true;
-let chargeDir = -1;
+let requiredBounce = false;
+const presetBallCounts = [0, 3, 5, 8, 10, 15];
+let smallBallCount = presetBallCounts[2];
 
 const bigBallSize = 75;
 const mediumBallSize = 50;
 const smallBallSize = 37;
-//game engine settings
-const gravity = 0.0;
-const drag = 0.988;
-const damping = 0.99;
-const backgroundImage = new Image();
-//determines how far it will spawn the balls based on the top/bottom border
-const distanceFromSide = 300;
+const distanceFromSide = 300; //determines how far it will spawn the balls based on the top/bottom border
 
-const availableSprites = Array.from(new Array(32), (x, i) => i + 1);
+//visual settings
+let chosenSprites = [];
+let renderLinesBetween = true;
+let chargeDir = -1;
+
+//physics settings
+const gravity = 0.0;
+const drag = 0.983;
+const damping = 0.98;
+
+const backgroundImage = new Image();
+
+//These are the "names" of sprites that will be used
+// Since I named the sprites using numbers I just generate an array of numbers and then filter out the sprites I don't want
+const availableSprites = Array.from(new Array(32), (x, i) => i + 1).filter(
+	(s) => s !== 9 && s !== 14 && s !== 15,
+);
 backgroundImage.src = "./abstract_dots.svg";
 let clickedBub = null;
 
@@ -52,7 +65,7 @@ class Block {
 		this.borderRadius = borderRadius;
 	}
 	getCenter() {
-		return pos.add(dim.div(2));
+		return this.pos.add(this.dim.div(2));
 	}
 	render(ctx) {
 		ctx.fillStyle = "F0EBE3";
@@ -67,28 +80,38 @@ class Block {
 		);
 	}
 }
-class Button{
+class Button {
 	pos;
 	dim;
 	onClick;
 	text;
 	color;
-	constructor(pos,dim,text,onClick,color="red"){
-		this.pos = pos
-		this.dim =dim
-		this.text= text
-		this.onClick = onClick
-		this.color = color
+	borderRadius;
+	constructor(pos, dim, text, onClick, color = "red", borderRadius = 55) {
+		this.pos = pos;
+		this.dim = dim;
+		this.text = text;
+		this.onClick = onClick;
+		this.color = color;
+		this.borderRadius = borderRadius;
 	}
-	isInside(pos){
-		return (pos.x>=this.pos.x&&this.pos.x<=this.pos.x+this.dim.x&&pos.y>=this.pos.y&&this.pos.y<=this.pos.y+this.dim.y)
+	getCenter() {
+		return this.pos.add(this.dim.div(2));
 	}
-	checkClick(pos=mousePos){
-		if(this.isInside(pos)){
-			this.onClick()
+	isInside(checkPos) {
+		return (
+			checkPos.x >= this.pos.x &&
+			checkPos.x <= this.pos.x + this.dim.x &&
+			checkPos.y >= this.pos.y &&
+			checkPos.y <= this.pos.y + this.dim.y
+		);
+	}
+	checkClick(pos = mousePos) {
+		if (this.isInside(pos)) {
+			this.onClick(this);
 		}
 	}
-	render(ctx){
+	render(ctx) {
 		ctx.fillStyle = this.color;
 		drawRoundedRect(
 			ctx,
@@ -97,9 +120,15 @@ class Button{
 			Math.floor(this.pos.y),
 			this.dim.x,
 			this.dim.y,
-			15,
+			this.borderRadius,
 		);
-
+		ctx.fillStyle = "black";
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.font = `${Math.floor(this.dim.y / 3)}px "verdana", sans-serif`;
+		const fontMeasurement = ctx.measureText(this.text);
+		const center = this.getCenter();
+		ctx.fillText(this.text, center.x, center.y, this.dim.x);
 	}
 }
 class Bubble {
@@ -116,7 +145,7 @@ class Bubble {
 		this.radius = radius;
 		this.velocity = velocity;
 		this.sprite = new Image();
-		this.sprite.src = spriteSrc || "./balls/1.png";
+		this.sprite.src = spriteSrc || "./balls/2.png";
 		this.rotSpeed = 0;
 		this.player = player;
 	}
@@ -391,6 +420,9 @@ const isColliding = (testBub) => {
 	}
 	return false;
 };
+function getSprite(num) {
+	return `./balls/${availableSprites[num]}.png`;
+}
 function drawImage(ctx, img, pos, scale, rotation) {
 	ctx.save();
 	ctx.translate(Math.floor(pos.x), Math.floor(pos.y));
@@ -437,6 +469,166 @@ function drawRoundedRect(ctx, x, y, width, height, borderRadius) {
 	ctx.fill();
 }
 
+function prepareStart() {
+	const buttonDim = new Vector(600, 200);
+	const spacing = 40;
+	const onColor = "#92D8F8";
+	const offColor = "#363858";
+	//going from bottom to top
+	//START button
+	const startButtonDim = new Vector(700, 250);
+	buttons.push(
+		new Button(
+			new Vector(
+				(canvas.width - startButtonDim.x) / 2,
+				canvas.height - startButtonDim.y - 100,
+			),
+			startButtonDim,
+			"START",
+			(but) => {
+				resetGame();
+				gameState = 1;
+			},
+			"pink",
+		),
+	);
+	//MIDDLE BLOCK TOGGLE
+	buttons.push(
+		new Button(
+			new Vector(
+				(canvas.width - buttonDim.x) / 2,
+				canvas.height - buttonDim.y * 1 - 400,
+			),
+			buttonDim,
+			enableMiddleBlocks ? "Blocks: Enabled" : "Blocks: Disabled",
+			(but) => {
+				enableMiddleBlocks = !enableMiddleBlocks;
+				but.text = enableMiddleBlocks ? "Blocks: Enabled" : "Blocks: Disabled";
+				but.color = enableMiddleBlocks ? onColor : offColor;
+			},
+
+			enableMiddleBlocks ? onColor : offColor,
+		),
+	);
+	// BOUNCE TOGGLE
+	buttons.push(
+		new Button(
+			new Vector(
+				(canvas.width - buttonDim.x) / 2,
+				canvas.height - buttonDim.y * 2 - 400 - spacing * 1,
+			),
+			buttonDim,
+			requiredBounce
+				? "Require one bounce: Enabled"
+				: "Require one bounce: Disabled",
+			(but) => {
+				requiredBounce = !requiredBounce;
+				but.text = requiredBounce
+					? "Require one bounce: Enabled"
+					: "Require one bounce: Disabled";
+				but.color = requiredBounce ? onColor : offColor;
+			},
+
+			requiredBounce ? onColor : offColor,
+		),
+	);
+	// CHANGE BALL COUNT BUTTONS
+	const startingBallCountRatio =
+		smallBallCount / presetBallCounts[presetBallCounts.length - 1];
+	const ballCountColor = `rgb(${
+		-startingBallCountRatio * 100 + 200
+	}, ${233}, ${203})`;
+	buttons.push(
+		new Button(
+			new Vector(
+				(canvas.width - buttonDim.x) / 2,
+				canvas.height - buttonDim.y * 3 - 400 - spacing * 2,
+			),
+			buttonDim,
+			smallBallCount,
+			(but) => {
+				const currentIndex = presetBallCounts.indexOf(smallBallCount);
+				smallBallCount =
+					presetBallCounts[(currentIndex + 1) % presetBallCounts.length];
+				const ballCountRatio =
+					smallBallCount / presetBallCounts[presetBallCounts.length - 1];
+				but.color = `rgb(${-ballCountRatio * 100 + 200}, ${233}, ${203})`;
+				but.text = smallBallCount;
+			},
+
+			ballCountColor,
+		),
+	);
+	//
+	// PREVIEW BALLS AND BUTTONS
+	// There are two balls each with two buttons to cycle all availableSprites and choose
+	const previewPosCenter = new Vector(canvas.width / 2, 350);
+
+	const previewButtonSwitchDim = new Vector(80, bigBallSize * 2);
+	const previewButtonColor = "#dbedd0";
+	const previewBubbleOffset = 200;
+	//Get random starting sprites that are different to each other
+	chosenSprites[0] =
+		chosenSprites[0] || Math.floor(Math.random() * availableSprites.length);
+	do {
+		chosenSprites[1] =
+			chosenSprites[1] || Math.floor(Math.random() * availableSprites.length);
+	} while (chosenSprites[0] === chosenSprites[1]);
+
+	//Do for both players
+	for (let i = 0; i <= 1; i++) {
+		const sign = i * 2 - 1; //p1=>-1;p2=>1
+		previewBubbles.push(
+			new Bubble(
+				previewPosCenter.add(new Vector(sign * previewBubbleOffset, 0)),
+				bigBallSize,
+				new Vector(),
+				getSprite(chosenSprites[i]),
+				i + 1,
+			),
+		);
+		buttons.push(
+			new Button(
+				previewPosCenter.add(
+					new Vector(
+						sign * previewBubbleOffset - bigBallSize - previewButtonSwitchDim.x,
+						-previewButtonSwitchDim.y / 2,
+					),
+				),
+				previewButtonSwitchDim,
+				"<",
+				(but) => {
+					chosenSprites[i] = (chosenSprites[i] - 1) % availableSprites.length;
+					if (chosenSprites[i] < 0)
+						chosenSprites[i] = availableSprites.length - 1;
+					previewBubbles[i].sprite.src = getSprite(chosenSprites[i]);
+				},
+
+				previewButtonColor,
+				20,
+			),
+		);
+		buttons.push(
+			new Button(
+				previewPosCenter.add(
+					new Vector(
+						sign * previewBubbleOffset + bigBallSize,
+						-previewButtonSwitchDim.y / 2,
+					),
+				),
+				previewButtonSwitchDim,
+				">",
+				(but) => {
+					chosenSprites[i] = (chosenSprites[i] + 1) % availableSprites.length;
+					previewBubbles[i].sprite.src = getSprite(chosenSprites[i]);
+				},
+
+				previewButtonColor,
+				20,
+			),
+		);
+	}
+}
 function prepareBoard() {
 	const sideBlockDim = new Vector(30, 700);
 	const sideBlockOffset = sideBlockDim.x / 5;
@@ -452,47 +644,51 @@ function prepareBoard() {
 	);
 	blocks.push(new Block(rightBlockPos, sideBlockDim.mult(1)));
 
-	// Spawn mid blocks
-	const blockCount = Math.round(Math.random()) + 1;
-	if (blockCount === 1) {
-		const size = 230 + 170 * Math.random();
-		const midBlockPos = new Vector(
-			sideBlockOffset +
-				sideBlockDim.x +
-				Math.random() *
-					(canvas.width - size - 2 * (sideBlockOffset + sideBlockDim.x)),
-			(canvas.height - sideBlockDim.x) / 2,
-		);
-		blocks.push(new Block(midBlockPos, new Vector(size, sideBlockDim.x)));
-	} else if (blockCount === 2) {
-		const size1 = 170 + 80 * Math.random();
-		const size2 = 100 + 50 * Math.random();
-		const firstMidBlockPos = new Vector(
-			sideBlockOffset +
-				sideBlockDim.x +
-				Math.random() *
-					(canvas.width -
-						size1 -
-						size2 -
-						2 * (sideBlockOffset + sideBlockDim.x)),
-			(canvas.height - sideBlockDim.x) / 2,
-		);
-		const secondMidBlockPos = new Vector(
-			firstMidBlockPos.x +
-				size1 +
-				Math.random() *
-					(canvas.width -
-						size1 -
-						size2 -
-						firstMidBlockPos.x -
-						sideBlockOffset -
-						sideBlockDim.x),
-			(canvas.height - sideBlockDim.x) / 2,
-		);
-		blocks.push(new Block(firstMidBlockPos, new Vector(size1, sideBlockDim.x)));
-		blocks.push(
-			new Block(secondMidBlockPos, new Vector(size2, sideBlockDim.x)),
-		);
+	if (enableMiddleBlocks) {
+		// Spawn mid blocks
+		const blockCount = Math.round(Math.random()) + 1;
+		if (blockCount === 1) {
+			const size = 230 + 170 * Math.random();
+			const midBlockPos = new Vector(
+				sideBlockOffset +
+					sideBlockDim.x +
+					Math.random() *
+						(canvas.width - size - 2 * (sideBlockOffset + sideBlockDim.x)),
+				(canvas.height - sideBlockDim.x) / 2,
+			);
+			blocks.push(new Block(midBlockPos, new Vector(size, sideBlockDim.x)));
+		} else if (blockCount === 2) {
+			const size1 = 170 + 80 * Math.random();
+			const size2 = 100 + 50 * Math.random();
+			const firstMidBlockPos = new Vector(
+				sideBlockOffset +
+					sideBlockDim.x +
+					Math.random() *
+						(canvas.width -
+							size1 -
+							size2 -
+							2 * (sideBlockOffset + sideBlockDim.x)),
+				(canvas.height - sideBlockDim.x) / 2,
+			);
+			const secondMidBlockPos = new Vector(
+				firstMidBlockPos.x +
+					size1 +
+					Math.random() *
+						(canvas.width -
+							size1 -
+							size2 -
+							firstMidBlockPos.x -
+							sideBlockOffset -
+							sideBlockDim.x),
+				(canvas.height - sideBlockDim.x) / 2,
+			);
+			blocks.push(
+				new Block(firstMidBlockPos, new Vector(size1, sideBlockDim.x)),
+			);
+			blocks.push(
+				new Block(secondMidBlockPos, new Vector(size2, sideBlockDim.x)),
+			);
+		}
 	}
 }
 backgroundImage.onload = (e) => {
@@ -520,25 +716,21 @@ function prepareOffscreenCanvas() {
 	);
 	offCtx.restore();
 	// Line in middle
-	offCtx.lineWidth = 3;
-	offCtx.strokeStyle = "rgba(0, 0, 0, 0.4)";
-	offCtx.beginPath();
-	offCtx.moveTo(offscreenCanvas.width / 10, offscreenCanvas.height / 2);
-	offCtx.lineTo((9 * offscreenCanvas.width) / 10, offscreenCanvas.height / 2);
-	offCtx.stroke();
+	if (enableMiddleBlocks && gameState !== 2) {
+		offCtx.lineWidth = 3;
+		offCtx.strokeStyle = "rgba(0, 0, 0, 0.4)";
+		offCtx.beginPath();
+		offCtx.moveTo(offscreenCanvas.width / 10, offscreenCanvas.height / 2);
+		offCtx.lineTo((9 * offscreenCanvas.width) / 10, offscreenCanvas.height / 2);
+		offCtx.stroke();
+	}
 	//render static blocks
 	for (const block of blocks) {
 		block.render(offCtx);
 	}
 }
-function spawnPlayerBalls(
-	center,
-	playerSprite,
-	playerNum,
-	top,
-	smallCount = 10,
-) {
-	//converts bool to int
+function spawnPlayerBalls(center, playerSprite, playerNum, top) {
+	//converts bool to int (-1 or 1)
 	const side = +top * 2 - 1;
 	const newBub = new Bubble(
 		center,
@@ -564,10 +756,10 @@ function spawnPlayerBalls(
 		);
 	}
 	// random small ones
-	const iterMax = 100;
+	const iterMax = 150;
 	let iterCount = 0;
 	let iterAll = 0;
-	while (iterCount <= smallCount && iterAll < iterMax) {
+	while (iterCount < smallBallCount && iterAll <= iterMax) {
 		const newSmallBub = new Bubble(
 			new Vector(
 				smallBallSize + Math.random() * (canvas.width - smallBallSize * 2),
@@ -584,30 +776,32 @@ function spawnPlayerBalls(
 		}
 		iterAll++;
 	}
+	if (iterAll >= iterMax) {
+		console.error("couldn't spawn all small bubbles :(");
+	}
 }
 function init() {
+	// DO THIS FIRST ALWAYS (the game is made for a constant width and height)
 	resizeCanvas();
-	if (enableMiddleBlocks) {
-		prepareBoard();
-	}
 
+	prepareBoard();
+
+	prepareStart();
 	const topPlayerCenter = new Vector(canvas.width / 2, distanceFromSide);
 	const bottomPlayerCenter = new Vector(
 		canvas.width / 2,
 		canvas.height - distanceFromSide,
 	);
-	const p1 =
-		availableSprites[Math.floor(Math.random() * availableSprites.length)];
-	const p2 = availableSprites.filter((n) => n !== p1)[
-		Math.floor(Math.random() * availableSprites.length)
-	];
-	spawnPlayerBalls(topPlayerCenter, `./balls/${p1}.png`, 1, true);
-	spawnPlayerBalls(bottomPlayerCenter, `./balls/${p2}.png`, 2, false);
+	spawnPlayerBalls(topPlayerCenter, getSprite(chosenSprites[0]), 1, true);
+	spawnPlayerBalls(bottomPlayerCenter, getSprite(chosenSprites[1]), 2, false);
 }
 function resetGame() {
 	gameState = 0;
 	bubbles = [];
 	blocks = [];
+	buttons = [];
+	previewBubbles = [];
+
 	currentPlayer = Math.round(Math.random()) + 1;
 	init();
 	prepareOffscreenCanvas();
@@ -618,9 +812,9 @@ function resizeCanvas() {
 	canvas.width = 950;
 }
 function winGame(player) {
+	gameState = 2;
 	blocks = [];
 	prepareOffscreenCanvas();
-	gameState=1;
 	winningPlayer = player;
 }
 function switchPlayer() {
@@ -632,7 +826,7 @@ function switchPlayer() {
 }
 const allStopped = () => {
 	for (const bubble of bubbles) {
-		if (bubble.velocity.length() > 0.3) return false;
+		if (bubble.velocity.length() > 0.24) return false;
 	}
 	return true;
 };
@@ -658,10 +852,7 @@ const getWinner = () => {
 	}
 	return 0;
 };
-// Generic update func, handles collision
-function update(tFrame) {
-	frame = tFrame;
-	bubbles = bubbles.filter((b) => !b.outOfBounds());
+function updateAllBubbles() {
 	bubbles.forEach((b1, i) => {
 		b1.update();
 		for (const b2 of bubbles.slice(i + 1)) {
@@ -671,15 +862,21 @@ function update(tFrame) {
 			b1.collideBlock(block);
 		}
 	});
-	//no movement => other player can play
-	if (allStopped()) {
+}
+// Generic update func, handles collision
+function update(tFrame) {
+	frame = tFrame;
+	// Delete bubbles out of bounds
+	bubbles = bubbles.filter((b) => !b.outOfBounds());
+	updateAllBubbles();
+	//(almost)no movement => other player can play
+	if (allStopped() && isWaiting) {
+		// Simulate a 1000 frames so you don't have to wait for everything to completely stop
 		for (i = 0; i < 1000; i++) {
-			for (const bubble of bubbles) {
-				bubble.update();
-			}
+			updateAllBubbles();
 		}
 		isWaiting = false;
-		//win checking
+		//win checking (no bubbles=>draw,else getWinner())
 		if (bubbles.length === 0) {
 			winGame(0);
 		} else {
@@ -740,7 +937,10 @@ function render(ctx) {
 			200,
 		);
 		if (raycastHit) {
-			ctx.fillStyle = "blue";
+			ctx.fillStyle =
+				clickedBub.player === 2
+					? "rgba(158, 152, 250, 0.3)"
+					: "rgba(250, 163, 152, 0.3)";
 			drawCircle(ctx, raycastHit, clickedBub.radius);
 		}
 		end = bubPos.add(bubPos.sub(mousePos).mult(chargeDir));
@@ -775,24 +975,23 @@ function renderEnd(ctx) {
 		(canvas.height * 2) / 3,
 	);
 }
-let buttons = [new Button(new Vector(10,100),new Vector(100,100),"DHH",()=>console.log("DASDDSA"))]
-function renderStart(ctx){
-
+function renderStart(ctx) {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	ctx.drawImage(offscreenCanvas, 0, 0);
-	buttons[0].render(ctx)
+	for (const button of buttons) {
+		button.render(ctx);
+	}
+	for (const previewBubble of previewBubbles) {
+		previewBubble.render(ctx);
+	}
 
 	ctx.fillStyle = "black";
 	ctx.textAlign = "center";
-	ctx.font = 'bold 120px "verdana", sans-serif';
-	ctx.fillText("TEST", canvas.width / 2, canvas.height / 2);
-	ctx.font = '60px "verdana", sans-serif';
-	ctx.fillText(
-		"Click to continue...",
-		canvas.width / 2,
-		(canvas.height * 2) / 3,
-	);
-
+	ctx.font = 'bold 100px "Helvetica", sans-serif';
+	ctx.fillText("The bubble game", canvas.width / 2, canvas.height / 8);
+}
+function randomFromArray(arr) {
+	return arr[Math.floor(Math.random() * arr.length)];
 }
 function raycastSphere(from, to, radius, exclude, steps = 100) {
 	const dir = to.sub(from);
@@ -829,7 +1028,7 @@ function get_bubble_in_pos(pos) {
 	return null;
 }
 
-function getMousePos(event) {
+function convertEventPos(event) {
 	const rect = canvas.getBoundingClientRect();
 	const scaleX = canvas.width / rect.width;
 	const scaleY = canvas.height / rect.height;
@@ -842,28 +1041,29 @@ function getMousePos(event) {
 
 window.addEventListener("resize", resizeCanvas);
 document.addEventListener("pointermove", (e) => {
-	mousePos = getMousePos(e);
+	mousePos = convertEventPos(e);
 });
 
 // start aiming (saves the clicked bubble)
 document.addEventListener("pointerdown", (e) => {
-	if(gameState===0){
-		for (const button of buttons){
-			button.checkClick(getMousePos(e))
-		}
+	evCache.push(e);
+	if (evCache.length === 2) {
+		startingTouchCenter = convertEventPos(evCache[0]).add(
+			convertEventPos(evCache[1]).sub(convertEventPos(evCache[0])).div(2),
+		);
 	}
-	if (gameState===2) {
+	mousePos = convertEventPos(e);
+
+	if (gameState === 0) {
+		for (const button of buttons) {
+			button.checkClick(convertEventPos(e));
+		}
+		return;
+	}
+	if (gameState === 2) {
 		resetGame();
 		return;
 	}
-	evCache.push(e);
-	if (evCache.length === 2) {
-		startingTouchCenter = getMousePos(evCache[0]).add(
-			getMousePos(evCache[1]).sub(getMousePos(evCache[0])).div(2),
-		);
-	}
-	mousePos = getMousePos(e);
-
 	if (!isWaiting) {
 		clickedBub = get_bubble_in_pos(mousePos);
 		if (clickedBub && clickedBub.player !== currentPlayer) {
@@ -880,7 +1080,7 @@ function removeEvent(ev) {
 }
 // Stopped aiming -> shoot
 document.addEventListener("pointerup", (e) => {
-	mousePos = getMousePos(e);
+	mousePos = convertEventPos(e);
 	removeEvent(e);
 	if (evCache.length < 2) {
 		previousEvDistance = -1;
@@ -940,13 +1140,12 @@ init();
 	function main(tFrame) {
 		window.requestAnimationFrame(main);
 
-		if(gameState===0){
-			renderStart(ctx)
-		}
-		else if (gameState===1) {
+		if (gameState === 0) {
+			renderStart(ctx);
+		} else if (gameState === 1) {
 			update(tFrame);
 			render(ctx);
-		} else if (gameState===2){
+		} else if (gameState === 2) {
 			renderEnd(ctx);
 		}
 	}
