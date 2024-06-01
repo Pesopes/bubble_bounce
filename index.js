@@ -34,7 +34,7 @@ const bigBallSize = 75;
 const mediumBallSize = 50;
 const smallBallSize = 37;
 const distanceFromSide = 300; //determines how far it will spawn the balls based on the top/bottom border
-
+const maxVelocityLen = 500;
 //visual settings
 let chosenSprites = [];
 let renderLinesBetween = true;
@@ -42,8 +42,10 @@ let chargeDir = -1;
 
 //physics settings
 const gravity = 0.0;
-const drag = 0.983;
-const damping = 0.98;
+const drag = 0.992;
+const damping = 0.96;
+
+const fireForce = 21;
 
 const backgroundImage = new Image();
 
@@ -568,12 +570,12 @@ function prepareStart() {
 	const previewButtonColor = "#dbedd0";
 	const previewBubbleOffset = 200;
 	//Get random starting sprites that are different to each other
-	chosenSprites[0] =
-		chosenSprites[0] || Math.floor(Math.random() * availableSprites.length);
-	do {
-		chosenSprites[1] =
-			chosenSprites[1] || Math.floor(Math.random() * availableSprites.length);
-	} while (chosenSprites[0] === chosenSprites[1]);
+	if (chosenSprites.length === 0) {
+		chosenSprites[0] = Math.floor(Math.random() * availableSprites.length);
+		do {
+			chosenSprites[1] = Math.floor(Math.random() * availableSprites.length);
+		} while (chosenSprites[0] === chosenSprites[1]);
+	}
 
 	//Do for both players
 	for (let i = 0; i <= 1; i++) {
@@ -869,14 +871,14 @@ function update(tFrame) {
 	// Delete bubbles out of bounds
 	bubbles = bubbles.filter((b) => !b.outOfBounds());
 	updateAllBubbles();
-	//(almost)no movement => other player can play
+	//(almost) no movement => other player can play
 	if (allStopped() && isWaiting) {
-		// Simulate a 1000 frames so you don't have to wait for everything to completely stop
+		// Simulate 1000 frames so you don't have to wait for everything to completely stop
 		for (i = 0; i < 1000; i++) {
 			updateAllBubbles();
 		}
 		isWaiting = false;
-		//win checking (no bubbles=>draw,else getWinner())
+		// Win checking (no bubbles=>draw,else getWinner())
 		if (bubbles.length === 0) {
 			winGame(0);
 		} else {
@@ -895,7 +897,7 @@ function render(ctx) {
 
 	ctx.drawImage(offscreenCanvas, 0, 0);
 
-	// Lines between near bubbles
+	// Lines between nearby bubbles
 	if (renderLinesBetween) {
 		const maxDistance = 600;
 		for (pn = 1; pn <= 2; pn++) {
@@ -916,7 +918,7 @@ function render(ctx) {
 		}
 	}
 
-	// render objects using their functions
+	// Render objects using their functions
 	for (bub of bubbles) {
 		bub.render(ctx);
 	}
@@ -936,6 +938,7 @@ function render(ctx) {
 			clickedBub,
 			200,
 		);
+		// Draws a transparent bubble where the raycast hit
 		if (raycastHit) {
 			ctx.fillStyle =
 				clickedBub.player === 2
@@ -943,15 +946,25 @@ function render(ctx) {
 					: "rgba(250, 163, 152, 0.3)";
 			drawCircle(ctx, raycastHit, clickedBub.radius);
 		}
-		end = bubPos.add(bubPos.sub(mousePos).mult(chargeDir));
-		ctx.beginPath();
+		let vecBetween = bubPos.sub(mousePos);
+
 		ctx.strokeStyle = "rgb(0 0 0)";
+		if (vecBetween.length() > maxVelocityLen) {
+			vecBetween = vecBetween.normalize().mult(maxVelocityLen);
+			ctx.strokeStyle = "rgb(120 0 0)";
+		}
+		const lengthRatio = vecBetween.length() / maxVelocityLen;
+		end = bubPos.add(vecBetween.mult(chargeDir));
+		ctx.beginPath();
+		ctx.setLineDash([5 + 5 * lengthRatio, 17 * lengthRatio]);
 		ctx.lineWidth = 6;
 		ctx.moveTo(bubPos.x, bubPos.y);
 		ctx.lineTo(end.x, end.y);
 		ctx.stroke();
+		ctx.setLineDash([]);
 	}
 }
+// End screen - shows who won
 function renderEnd(ctx) {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	ctx.drawImage(offscreenCanvas, 0, 0);
@@ -1086,17 +1099,16 @@ document.addEventListener("pointerup", (e) => {
 		previousEvDistance = -1;
 	}
 	if (clickedBub) {
-		const maxVelocity = 18;
-		const dirVec = clickedBub.pos.sub(mousePos).div(16).mult(chargeDir);
+		const dirVec = clickedBub.pos.sub(mousePos).mult(chargeDir);
 		clickedBub.velocity = dirVec
 			.normalize()
-			.mult(Math.min(dirVec.length(), maxVelocity));
+			.mult(
+				(Math.min(dirVec.length(), maxVelocityLen) / maxVelocityLen) *
+					fireForce,
+			);
 		clickedBub = null;
 		switchPlayer();
 		isWaiting = true;
-		// if (dirVec.length() >= maxVelocity) {
-		// 	console.log("MAXIMUM POWER");
-		// }
 	}
 });
 const zoomIn = () => {
