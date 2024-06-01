@@ -35,12 +35,12 @@ const mediumBallSize = 50;
 const smallBallSize = 37;
 const distanceFromSide = 300; //determines how far it will spawn the balls based on the top/bottom border
 const maxVelocityLen = 500;
-//visual settings
+// Visual settings
 let chosenSprites = [];
 let renderLinesBetween = true;
 let chargeDir = -1;
 
-//physics settings
+// Physics settings
 const gravity = 0.0;
 const drag = 0.992;
 const damping = 0.96;
@@ -49,7 +49,7 @@ const fireForce = 18;
 
 const backgroundImage = new Image();
 
-//These are the "names" of sprites that will be used
+// These are the "names" of sprites that will be used
 // Since I named the sprites using numbers I just generate an array of numbers and then filter out the sprites I don't want
 const availableSprites = Array.from(new Array(32), (x, i) => i + 1).filter(
 	(s) => s !== 9 && s !== 14 && s !== 15,
@@ -259,7 +259,7 @@ class Bubble {
 
 		return collisionDetected;
 	}
-	//BUG: collision with sides is offset by borderRadius (especially visible with a high borderRadius)
+	// BUG: collision with sides is offset by borderRadius (especially visible with a high borderRadius)
 	collideBlock(block) {
 		const borderRadius = block.borderRadius;
 		let collisionDetected = false;
@@ -476,8 +476,8 @@ function prepareStart() {
 	const spacing = 40;
 	const onColor = "#92D8F8";
 	const offColor = "#363858";
-	//going from bottom to top
-	//START button
+	// going from bottom to top
+	// START button
 	const startButtonDim = new Vector(700, 250);
 	buttons.push(
 		new Button(
@@ -567,7 +567,7 @@ function prepareStart() {
 	const previewButtonSwitchDim = new Vector(80, bigBallSize * 2);
 	const previewButtonColor = "#dbedd0";
 	const previewBubbleOffset = 200;
-	//Get random starting sprites that are different to each other
+	// Get random starting sprites that are different to each other
 	if (chosenSprites.length === 0) {
 		chosenSprites[0] = Math.floor(Math.random() * availableSprites.length);
 		do {
@@ -575,9 +575,9 @@ function prepareStart() {
 		} while (chosenSprites[0] === chosenSprites[1]);
 	}
 
-	//Do for both players
+	// Do for both players
 	for (let i = 0; i <= 1; i++) {
-		const sign = i * 2 - 1; //p1=>-1;p2=>1
+		const sign = i * 2 - 1; // p1=>-1;p2=>1
 		previewBubbles.push(
 			new Bubble(
 				previewPosCenter.add(new Vector(sign * previewBubbleOffset, 0)),
@@ -699,11 +699,11 @@ function prepareOffscreenCanvas() {
 	// set same dimensions
 	offscreenCanvas.width = canvas.width;
 	offscreenCanvas.height = canvas.height;
-	//clear with colour
+	// Clear with colour
 	offCtx.clearRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
 	offCtx.fillStyle = "#efe1e1";
 	offCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
-	//add background image
+	// Add background image
 	offCtx.save();
 	offCtx.filter = "drop-shadow(4px 4px 5px black) brightness(0.1) opacity(10%)";
 	offCtx.scale(2, 2);
@@ -724,13 +724,13 @@ function prepareOffscreenCanvas() {
 		offCtx.lineTo((9 * offscreenCanvas.width) / 10, offscreenCanvas.height / 2);
 		offCtx.stroke();
 	}
-	//render static blocks
+	// Render static blocks
 	for (const block of blocks) {
 		block.render(offCtx);
 	}
 }
 function spawnPlayerBalls(center, playerSprite, playerNum, top) {
-	//converts bool to int (-1 or 1)
+	// Converts bool to int (-1 or 1)
 	const side = +top * 2 - 1;
 	const newBub = new Bubble(
 		center,
@@ -755,7 +755,7 @@ function spawnPlayerBalls(center, playerSprite, playerNum, top) {
 			),
 		);
 	}
-	// random small ones
+	// Random small ones
 	const iterMax = 150;
 	let iterCount = 0;
 	let iterAll = 0;
@@ -869,7 +869,7 @@ function update(tFrame) {
 	// Delete bubbles out of bounds
 	bubbles = bubbles.filter((b) => !b.outOfBounds());
 	updateAllBubbles();
-	//(almost) no movement => other player can play
+	// (almost) no movement => other player can play
 	if (allStopped() && isWaiting) {
 		// Simulate 1000 frames so you don't have to wait for everything to completely stop
 		for (i = 0; i < 1000; i++) {
