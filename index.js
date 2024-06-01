@@ -520,14 +520,12 @@ function prepareStart() {
 				canvas.height - buttonDim.y * 2 - 400 - spacing * 1,
 			),
 			buttonDim,
-			requiredBounce
-				? "Require one bounce: Enabled"
-				: "Require one bounce: Disabled",
+			requiredBounce ? "Require bounce: Enabled" : "Require bounce: Disabled",
 			(but) => {
 				requiredBounce = !requiredBounce;
 				but.text = requiredBounce
-					? "Require one bounce: Enabled"
-					: "Require one bounce: Disabled";
+					? "Require bounce: Enabled"
+					: "Require bounce: Disabled";
 				but.color = requiredBounce ? onColor : offColor;
 			},
 
@@ -547,7 +545,7 @@ function prepareStart() {
 				canvas.height - buttonDim.y * 3 - 400 - spacing * 2,
 			),
 			buttonDim,
-			smallBallCount,
+			`Small balls: ${smallBallCount}`,
 			(but) => {
 				const currentIndex = presetBallCounts.indexOf(smallBallCount);
 				smallBallCount =
@@ -555,7 +553,7 @@ function prepareStart() {
 				const ballCountRatio =
 					smallBallCount / presetBallCounts[presetBallCounts.length - 1];
 				but.color = `rgb(${-ballCountRatio * 100 + 200}, ${233}, ${203})`;
-				but.text = smallBallCount;
+				but.text = `Small balls: ${smallBallCount}`;
 			},
 
 			ballCountColor,
