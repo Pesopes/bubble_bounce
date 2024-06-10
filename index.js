@@ -57,6 +57,7 @@ const availableSprites = Array.from(new Array(32), (x, i) => i + 1).filter(
 backgroundImage.src = "./abstract_dots.svg";
 let clickedBub = null;
 
+// Static obstacles for bubbles
 class Block {
 	pos;
 	dim;
@@ -82,6 +83,8 @@ class Block {
 		);
 	}
 }
+
+// Clickable rectangle
 class Button {
 	pos;
 	dim;
@@ -108,6 +111,7 @@ class Button {
 			checkPos.y <= this.pos.y + this.dim.y
 		);
 	}
+	// If is vec in bounds call onClick
 	checkClick(pos = mousePos) {
 		if (this.isInside(pos)) {
 			this.onClick(this);
@@ -133,6 +137,8 @@ class Button {
 		ctx.fillText(this.text, center.x, center.y, this.dim.x);
 	}
 }
+
+// Moving balls that you play with
 class Bubble {
 	pos;
 	radius;
@@ -151,12 +157,15 @@ class Bubble {
 		this.rotSpeed = 0;
 		this.player = player;
 	}
+
 	mass() {
 		return (Math.PI * this.radius * this.radius) / 100;
 	}
+
 	kineticEnergy() {
 		return (this.mass() / 2) * this.velocity.squared();
 	}
+
 	bounce() {
 		if (this.pos.x - this.radius <= 0) {
 			this.velocity.x *= -damping;
@@ -175,6 +184,7 @@ class Bubble {
 			this.pos.y = canvas.height - this.radius;
 		}
 	}
+	// If the ball is mostly outside (there's some leeway)
 	outOfBounds() {
 		const safeDistance = this.radius + this.radius / 3;
 		if (
@@ -260,6 +270,7 @@ class Bubble {
 		return collisionDetected;
 	}
 	// BUG: collision with sides is offset by borderRadius (especially visible with a high borderRadius)
+	// Handle collision with a Block
 	collideBlock(block) {
 		const borderRadius = block.borderRadius;
 		let collisionDetected = false;
@@ -336,6 +347,7 @@ class Bubble {
 			this.bouncedOffWall = true;
 		}
 	}
+	// Handle collision with another Bubble
 	collideBubble(other) {
 		const vec = this.pos.sub(other.pos);
 		const minDistance = this.radius + other.radius;
@@ -422,9 +434,11 @@ const isColliding = (testBub) => {
 	}
 	return false;
 };
+// Converts a number to sprite path 
 function getSprite(num) {
 	return `./balls/${availableSprites[num]}.png`;
 }
+// Generic draw image
 function drawImage(ctx, img, pos, scale, rotation) {
 	ctx.save();
 	ctx.translate(Math.floor(pos.x), Math.floor(pos.y));
@@ -432,13 +446,14 @@ function drawImage(ctx, img, pos, scale, rotation) {
 	ctx.drawImage(img, -scale / 2, -scale / 2, scale, scale);
 	ctx.restore();
 }
-
+// Generic draw circle
 function drawCircle(ctx, pos, radius) {
 	ctx.beginPath();
 	ctx.arc(Math.floor(pos.x), Math.floor(pos.y), radius, 0, Math.PI * 2);
 	ctx.fill();
 }
 
+// Generic draw rounded rect
 function drawRoundedRect(ctx, x, y, width, height, borderRadius) {
 	// Begin path
 	ctx.strokeStyle = "rgba(0, 0, 0, 1.0)";
@@ -471,6 +486,7 @@ function drawRoundedRect(ctx, x, y, width, height, borderRadius) {
 	ctx.fill();
 }
 
+// Create the main menu elements
 function prepareStart() {
 	const buttonDim = new Vector(600, 200);
 	const spacing = 40;
@@ -629,6 +645,8 @@ function prepareStart() {
 		);
 	}
 }
+
+// Create static playing blocks at random positions
 function prepareBoard() {
 	const sideBlockDim = new Vector(30, 700);
 	const sideBlockOffset = sideBlockDim.x / 5;
@@ -691,10 +709,12 @@ function prepareBoard() {
 		}
 	}
 }
+
+// Since it is made only once do it after the image is loaded
 backgroundImage.onload = (e) => {
 	prepareOffscreenCanvas();
 };
-// TODO: finish
+// The offscreen canvas is rendered once to increase performance
 function prepareOffscreenCanvas() {
 	// set same dimensions
 	offscreenCanvas.width = canvas.width;
@@ -729,6 +749,7 @@ function prepareOffscreenCanvas() {
 		block.render(offCtx);
 	}
 }
+// Spawn the playing balls, some in preset positions and sizes, others randomly
 function spawnPlayerBalls(center, playerSprite, playerNum, top) {
 	// Converts bool to int (-1 or 1)
 	const side = +top * 2 - 1;
@@ -780,6 +801,7 @@ function spawnPlayerBalls(center, playerSprite, playerNum, top) {
 		console.error("couldn't spawn all small bubbles :(");
 	}
 }
+// This is called first
 function init() {
 	// DO THIS FIRST ALWAYS (the game is made for a constant width and height)
 	resizeCanvas();
