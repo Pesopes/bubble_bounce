@@ -6,7 +6,7 @@ It is written in pure JS.
 
 The concept is based on one of the mini-games in the game called **Shmatoosto** by [Yiotro](https://yiotro.com/about/). Sadly it's been unpublished since due to increasing demands from google on the play store. 
 
-[Yiotro explaining why he pulled the app](./yiotro_explanation.png)
+![Yiotro explaining why he pulled the app](./yiotro_explanation.png)
 
 ## Notes
 
