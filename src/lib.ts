@@ -25,14 +25,14 @@ export class Vector {
     }
   }
 
-  div(a) {
+  div(a: Vector | number) {
     if (a instanceof Vector) {
       return new Vector(this.x / a.x, this.y / a.y)
     } else {
       return new Vector(this.x / a, this.y / a)
     }
   }
-  mult(a) {
+  mult(a: Vector | number) {
     if (a instanceof Vector) {
       return new Vector(this.x * a.x, this.y * a.y)
     } else {
@@ -40,7 +40,7 @@ export class Vector {
     }
   }
 
-  add(a) {
+  add(a: Vector | number) {
     if (a instanceof Vector) {
       return new Vector(this.x + a.x, this.y + a.y)
 
@@ -49,7 +49,7 @@ export class Vector {
     }
   }
 
-  sub(a) {
+  sub(a: Vector | number) {
     if (a instanceof Vector) {
       return new Vector(this.x - a.x, this.y - a.y)
     } else {
@@ -61,11 +61,11 @@ export class Vector {
     return new Vector(-this.x, -this.y)
   }
 
-  dot(a) {
+  dot(a: Vector) {
     return this.x * a.x + this.y * a.y
   }
 
-  static lerp(a, b, t) {
+  static lerp(a: Vector, b: Vector, t: Vector | number) {
     return a.add(b.sub(a).mult(t))
   }
 }
@@ -75,7 +75,7 @@ export class Block {
   pos;
   dim;
   borderRadius;
-  constructor(pos, dim, borderRadius = 1) {
+  constructor(pos: Vector, dim: Vector, borderRadius = 1) {
     this.pos = pos;
     this.dim = dim;
     this.borderRadius = borderRadius;
@@ -83,7 +83,7 @@ export class Block {
   getCenter() {
     return this.pos.add(this.dim.div(2));
   }
-  render(ctx) {
+  render(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
     ctx.fillStyle = "F0EBE3";
     drawRoundedRect(
       ctx,
@@ -105,7 +105,7 @@ export class Button {
   text;
   color;
   borderRadius;
-  constructor(pos, dim, text, onClick, color = "red", borderRadius = 55) {
+  constructor(pos: Vector, dim: Vector, text: string, onClick: (btn: Button) => void, color = "red", borderRadius = 55) {
     this.pos = pos;
     this.dim = dim;
     this.text = text;
@@ -116,7 +116,7 @@ export class Button {
   getCenter() {
     return this.pos.add(this.dim.div(2));
   }
-  isInside(checkPos) {
+  isInside(checkPos: Vector) {
     return (
       checkPos.x >= this.pos.x &&
       checkPos.x <= this.pos.x + this.dim.x &&
@@ -125,12 +125,12 @@ export class Button {
     );
   }
   // If is vec in bounds call onClick
-  checkClick(pos = mousePos) {
+  checkClick(pos: Vector) {
     if (this.isInside(pos)) {
       this.onClick(this);
     }
   }
-  render(ctx) {
+  render(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
     ctx.fillStyle = this.color;
     drawRoundedRect(
       ctx,
@@ -158,10 +158,10 @@ export class Bubble {
   velocity;
   sprite;
   rotSpeed;
-  rot;
+  rot: number = 0;
   player;
-  bouncedOffWall;
-  constructor(pos, radius, velocity, spriteImg, player = 0) {
+  bouncedOffWall: boolean = false;
+  constructor(pos: Vector, radius: number, velocity: Vector, spriteImg: HTMLImageElement, player = 0) {
     this.pos = pos;
     this.radius = radius;
     this.velocity = velocity;
@@ -180,7 +180,7 @@ export class Bubble {
 
 
   // If the ball is mostly outside (there's some leeway)
-  outOfBounds(width, height) {
+  outOfBounds(width: number, height: number) {
     const safeDistance = this.radius + this.radius / 3;
     if (
       this.pos.x - this.radius + safeDistance <= 0 ||
@@ -193,14 +193,14 @@ export class Bubble {
     }
     return false;
   }
-  isCollidingBubble(other) {
+  isCollidingBubble(other: Bubble) {
     const vec = this.pos.sub(other.pos);
     const minDistance = this.radius + other.radius;
     const distance = vec.length();
     return distance <= minDistance;
   }
   // Unnecessary code copying from collision resolution (TODO: fix)
-  isCollidingBlock(block) {
+  isCollidingBlock(block: Block) {
     const borderRadius = block.borderRadius;
     let collisionDetected = false;
     let normal = new Vector(0, 0);
@@ -266,7 +266,7 @@ export class Bubble {
   }
   // BUG: collision with sides is offset by borderRadius (especially visible with a high borderRadius)
   // Handle collision with a Block
-  collideBlock(block) {
+  collideBlock(block: Block) {
     const borderRadius = block.borderRadius;
     let collisionDetected = false;
     let normal = new Vector(0, 0);
@@ -343,7 +343,7 @@ export class Bubble {
     }
   }
   // Handle collision with another Bubble
-  collideBubble(other) {
+  collideBubble(other: Bubble) {
     const vec = this.pos.sub(other.pos);
     const minDistance = this.radius + other.radius;
     const distance = vec.length();
@@ -388,7 +388,7 @@ export class Bubble {
     this.pos = this.pos.add(this.velocity);
   }
 
-  render(ctx) {
+  render(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
     //TODO: color
     // drawCircle(ctx,this.pos, this.radius)
     // ctx.fillStyle = "rgb(200 0 0)";
@@ -398,19 +398,19 @@ export class Bubble {
     drawImage(ctx, this.sprite, this.pos, this.radius * 2, this.rot);
   }
 
-  simpleRender(ctx) {
+  simpleRender(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, color = "rgb(200 0 0)") {
     ctx.fillStyle = color;
     drawCircle(ctx, this.pos, this.radius);
   }
 
-  isInside(pos) {
+  isInside(pos: Vector) {
     const dist = pos.sub(this.pos).length();
     return dist <= this.radius;
   }
 }
 
 // Generic draw image
-function drawImage(ctx, img, pos, scale, rotation) {
+function drawImage(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, img: HTMLImageElement, pos: Vector, scale: number, rotation: number) {
   ctx.save();
   ctx.translate(Math.floor(pos.x), Math.floor(pos.y));
   ctx.rotate(rotation);
@@ -418,14 +418,14 @@ function drawImage(ctx, img, pos, scale, rotation) {
   ctx.restore();
 }
 // Generic draw circle
-export function drawCircle(ctx, pos, radius) {
+export function drawCircle(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, pos: Vector, radius: number) {
   ctx.beginPath();
   ctx.arc(Math.floor(pos.x), Math.floor(pos.y), radius, 0, Math.PI * 2);
   ctx.fill();
 }
 
 // Generic draw rounded rect
-function drawRoundedRect(ctx, x, y, width, height, borderRadius) {
+function drawRoundedRect(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, x: number, y: number, width: number, height: number, borderRadius: number) {
   // Begin path
   ctx.strokeStyle = "rgba(0, 0, 0, 1.0)";
   ctx.lineWidth = 6;

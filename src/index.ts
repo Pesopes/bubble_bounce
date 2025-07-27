@@ -1,5 +1,6 @@
-import { Vector, Bubble, Block, Button, drawCircle } from "./lib.js";
+import { Vector, Bubble, Block, Button, drawCircle } from "./lib";
 import backgroundImageSrc from "./assets/abstract_dots.svg";
+import { GameInputCallbacks, InputManager } from "./input";
 
 const ballSpriteModules = import.meta.glob("./assets/balls/*.png", {
 	eager: true,
@@ -8,32 +9,40 @@ const ballSpriteModules = import.meta.glob("./assets/balls/*.png", {
 });
 const ballSprites = Object.fromEntries(
 	Object.entries(ballSpriteModules).map(([path, url]) => {
-		const ballNumber = path.match(/(\d+)\.png$/)[1];
+		const match = path.match(/(\d+)\.png$/);
+		const ballNumber = match ? match[1] : "1";
 		const img = new Image();
-		img.src = url;
+		img.src = url as string;
 
 		return [ballNumber, img];
 	}),
 );
 
-const canvas = document.getElementById("main-canvas");
+const canvas = document.getElementById("main-canvas") as HTMLCanvasElement;
+if (!canvas) {
+	throw new Error("Canvas not found");
+}
 const ctx = canvas.getContext("2d");
+if (!ctx) {
+	throw new Error("2D context not found");
+}
 
 // Used for background and static objects (meant to improve performance)
 const offscreenCanvas = new OffscreenCanvas(canvas.width, canvas.height);
-const offCtx = offscreenCanvas.getContext("2d", { alpha: false });
 
-// Touch event stuff
+const offCtx = offscreenCanvas.getContext("2d", { alpha: false }) as OffscreenCanvasRenderingContext2D;
+if (!offCtx) {
+	throw new Error("2D context not found for offscreen canvas");
+}
+
 let mousePos = new Vector();
-let evCache = [];
-let previousEvDistance = -1;
-let startingTouchCenter = new Vector();
+
 
 // Spawned objects
-let bubbles = [];
-let blocks = [];
-let buttons = [];
-let previewBubbles = [];
+let bubbles: Bubble[] = [];
+let blocks: Block[] = [];
+let buttons: Button[] = [];
+let previewBubbles: Bubble[] = [];
 
 // game state
 let frame = 0;
@@ -54,7 +63,7 @@ const smallBallSize = 37;
 const distanceFromSide = 300; //determines how far it will spawn the balls based on the top/bottom border
 const maxVelocityLen = 500;
 // Visual settings
-let chosenSprites = [];
+let chosenSprites: number[] = [];
 let renderLinesBetween = true;
 let chargeDir = -1;
 
@@ -66,11 +75,11 @@ const backgroundImage = new Image();
 
 
 backgroundImage.src = backgroundImageSrc;
-let clickedBub = null;
+let clickedBub: Bubble | null = null;
 
 
 
-const isColliding = (testBub) => {
+const isColliding = (testBub: Bubble) => {
 	for (const block of blocks) {
 		if (testBub.isCollidingBlock(block)) {
 			return true;
@@ -83,11 +92,11 @@ const isColliding = (testBub) => {
 	}
 	return false;
 };
-function getBallSprite(index) {
+function getBallSprite(index: number) {
 	return Object.values(ballSprites)[index] || ballSprites["1"];
 }
 // Returns the sprite image based on the image name 
-function getBallSpriteByName(num) {
+function getBallSpriteByName(num: number) {
 	return ballSprites[num.toString()] || ballSprites["1"];
 }
 
@@ -113,7 +122,7 @@ function prepareStart() {
 			),
 			startButtonDim,
 			"START",
-			(but) => {
+			(_but) => {
 				resetGame();
 				gameState = 1;
 			},
@@ -222,7 +231,7 @@ function prepareStart() {
 				),
 				previewButtonSwitchDim,
 				"<",
-				(but) => {
+				(_but) => {
 					chosenSprites[i] = (chosenSprites[i] - 1) % Object.keys(ballSprites).length;
 					if (chosenSprites[i] < 0)
 						chosenSprites[i] = Object.keys(ballSprites).length - 1;
@@ -243,7 +252,7 @@ function prepareStart() {
 				),
 				previewButtonSwitchDim,
 				">",
-				(but) => {
+				(_but) => {
 					chosenSprites[i] = (chosenSprites[i] + 1) % Object.keys(ballSprites).length;
 					previewBubbles[i].sprite = getBallSprite(chosenSprites[i]);
 				},
@@ -320,7 +329,7 @@ function prepareBoard() {
 }
 
 // Since it is made only once do it after the image is loaded
-backgroundImage.onload = (e) => {
+backgroundImage.onload = (_e) => {
 	prepareOffscreenCanvas();
 };
 // The offscreen canvas is rendered once to increase performance
@@ -359,7 +368,7 @@ function prepareOffscreenCanvas() {
 	}
 }
 // Spawn the playing balls, some in preset positions and sizes, others randomly
-function spawnPlayerBalls(center, playerSprite, playerNum, top) {
+function spawnPlayerBalls(center: Vector, playerSprite: HTMLImageElement, playerNum: number, top: boolean) {
 	// Converts bool to int (-1 or 1)
 	const side = +top * 2 - 1;
 	const newBub = new Bubble(
@@ -425,6 +434,62 @@ function init() {
 	);
 	spawnPlayerBalls(topPlayerCenter, getBallSprite(chosenSprites[0]), 1, true);
 	spawnPlayerBalls(bottomPlayerCenter, getBallSprite(chosenSprites[1]), 2, false);
+
+	const gameCallbacks: GameInputCallbacks = {
+		onPointerMove: (pos) => { mousePos = pos; },
+		onPointerDown: (pos) => {
+			mousePos = pos;
+			if (gameState === 0) {
+				for (const button of buttons) {
+					button.checkClick(pos);
+				}
+				return;
+			}
+			if (gameState === 2) {
+				resetGame();
+				return;
+			}
+			// start aiming (saves the clicked bubble)
+			if (!isWaiting) {
+				clickedBub = get_bubble_in_pos(mousePos);
+				if (clickedBub && clickedBub.player !== currentPlayer) {
+					clickedBub = null;
+				}
+			}
+		},
+		onPointerUp(_pos) {
+			// Stopped aiming -> shoot
+			if (clickedBub) {
+				const dirVec = clickedBub.pos.sub(mousePos).mult(chargeDir);
+				clickedBub.velocity = dirVec
+					.normalize()
+					.mult(
+						(Math.min(dirVec.length(), maxVelocityLen) / maxVelocityLen) *
+						fireForce,
+					);
+				clickedBub = null;
+				switchPlayer();
+				isWaiting = true;
+			}
+		},
+		onScroll(deltaY) {
+			if (deltaY < 0) {
+				zoomIn();
+			} else {
+				zoomOut();
+			}
+		},
+		onPinch: (direction) => {
+			if (direction === "in") {
+				zoomIn();
+			} else if (direction === "out") {
+				zoomOut();
+			}
+		},
+		onResize: () => { resizeCanvas() }
+	}
+
+	const inputManager = new InputManager(canvas, gameCallbacks);
 }
 function resetGame() {
 	gameState = 0;
@@ -442,7 +507,7 @@ function resizeCanvas() {
 	canvas.height = 1600;
 	canvas.width = 950;
 }
-function winGame(player) {
+function winGame(player: 0 | 1 | 2) {
 	gameState = 2;
 	blocks = [];
 	prepareOffscreenCanvas();
@@ -462,7 +527,9 @@ const allStopped = () => {
 	return true;
 };
 
-const getWinner = () => {
+// TODO: make with an enum
+// Checks for remaining bubbles and returns the winner (0 for draw, 1 for player 1, 2 for player 2)
+const getWinner = (): 0 | 1 | 2 => {
 	let anyPlayer1 = false;
 	let anyPlayer2 = false;
 	for (const bubble of bubbles) {
@@ -475,13 +542,11 @@ const getWinner = () => {
 			break;
 		}
 	}
-	if (anyPlayer1 ^ anyPlayer2) {
-		if (anyPlayer1) {
-			return 2;
-		}
-		return 1;
+	if (anyPlayer1 && anyPlayer2) {
+		return 0; // draw
 	}
-	return 0;
+	return anyPlayer1 ? 2 : 1; // if player 1 has bubbles p2 wins and vice versa
+
 };
 function updateAllBubbles() {
 	bubbles.forEach((b1, i) => {
@@ -495,7 +560,7 @@ function updateAllBubbles() {
 	});
 }
 // Generic update func, handles collision
-function update(tFrame) {
+function update(tFrame: number) {
 	frame = tFrame;
 	// Delete bubbles out of bounds
 	bubbles = bubbles.filter((b) => !b.outOfBounds(canvas.width, canvas.height));
@@ -519,7 +584,7 @@ function update(tFrame) {
 	}
 }
 // Handles rendering of all objects and other stuff like the charge up lines
-function render(ctx) {
+function render(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
 	// Reset screen
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	// ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
@@ -528,7 +593,7 @@ function render(ctx) {
 
 	// Lines between nearby bubbles
 	if (renderLinesBetween) {
-		const maxDistance = 600;
+		const maxDistance = 300;
 		ctx.lineWidth = 2;
 		for (let pn = 1; pn <= 2; pn++) {
 			const playerBubbles = bubbles.filter((b) => b.player === pn);
@@ -602,7 +667,7 @@ function render(ctx) {
 	}
 }
 // End screen - shows who won
-function renderEnd(ctx) {
+function renderEnd(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	ctx.drawImage(offscreenCanvas, 0, 0);
 
@@ -625,7 +690,7 @@ function renderEnd(ctx) {
 		(canvas.height * 2) / 3,
 	);
 }
-function renderStart(ctx) {
+function renderStart(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	ctx.drawImage(offscreenCanvas, 0, 0);
 	for (const button of buttons) {
@@ -641,9 +706,11 @@ function renderStart(ctx) {
 	ctx.fillText("Bubble Bounce", canvas.width / 2, canvas.height / 8);
 }
 
-function raycastSphere(from, to, radius, exclude, steps = 100) {
+// TODO: make exclude an array and optional
+/// Uses a 'Bubble' for checking for collisions with other bubbles and blocks along the raycast
+function raycastSphere(from: Vector, to: Vector, radius: number, exclude: Bubble, steps = 100) {
 	const dir = to.sub(from);
-	const testBub = new Bubble(new Vector(), radius);
+	const testBub = new Bubble(new Vector(), radius, new Vector(), getBallSprite(1));
 	for (let i = 1; i <= steps; i++) {
 		const progress = i / steps;
 		const testPos = from.add(dir.mult(progress));
@@ -666,7 +733,7 @@ function raycastSphere(from, to, radius, exclude, steps = 100) {
 	return null;
 }
 
-function get_bubble_in_pos(pos) {
+function get_bubble_in_pos(pos: Vector) {
 	for (let i = 0; i < bubbles.length; i++) {
 		const b = bubbles[i];
 		if (b.isInside(pos)) {
@@ -676,116 +743,28 @@ function get_bubble_in_pos(pos) {
 	return null;
 }
 
-function convertEventPos(event) {
-	const rect = canvas.getBoundingClientRect();
-	const scaleX = canvas.width / rect.width;
-	const scaleY = canvas.height / rect.height;
 
-	return new Vector(
-		(event.clientX - rect.left) * scaleX,
-		(event.clientY - rect.top) * scaleY,
-	);
-}
 
-window.addEventListener("resize", resizeCanvas);
-document.addEventListener("pointermove", (e) => {
-	mousePos = convertEventPos(e);
-});
 
-// start aiming (saves the clicked bubble)
-document.addEventListener("pointerdown", (e) => {
-	evCache.push(e);
-	if (evCache.length === 2) {
-		startingTouchCenter = convertEventPos(evCache[0]).add(
-			convertEventPos(evCache[1]).sub(convertEventPos(evCache[0])).div(2),
-		);
-	}
-	mousePos = convertEventPos(e);
 
-	if (gameState === 0) {
-		for (const button of buttons) {
-			button.checkClick(convertEventPos(e));
-		}
-		return;
-	}
-	if (gameState === 2) {
-		resetGame();
-		return;
-	}
-	if (!isWaiting) {
-		clickedBub = get_bubble_in_pos(mousePos);
-		if (clickedBub && clickedBub.player !== currentPlayer) {
-			clickedBub = null;
-		}
-	}
-});
-function removeEvent(ev) {
-	// Remove this event from the target's cache
-	const index = evCache.findIndex(
-		(cachedEv) => cachedEv.pointerId === ev.pointerId,
-	);
-	evCache.splice(index, 1);
-}
-// Stopped aiming -> shoot
-document.addEventListener("pointerup", (e) => {
-	mousePos = convertEventPos(e);
-	removeEvent(e);
-	if (evCache.length < 2) {
-		previousEvDistance = -1;
-	}
-	if (clickedBub) {
-		const dirVec = clickedBub.pos.sub(mousePos).mult(chargeDir);
-		clickedBub.velocity = dirVec
-			.normalize()
-			.mult(
-				(Math.min(dirVec.length(), maxVelocityLen) / maxVelocityLen) *
-				fireForce,
-			);
-		clickedBub = null;
-		switchPlayer();
-		isWaiting = true;
-	}
-});
+
+
 const zoomIn = () => {
 	canvas.style.transform = "scale(1)";
 };
 const zoomOut = () => {
 	canvas.style.transform = "scale(0.8)";
 };
-document.addEventListener("pointermove", (e) => {
-	const index = evCache.findIndex(
-		(cachedE) => cachedE.pointerId === e.pointerId,
-	);
-	evCache[index] = e;
-	if (evCache.length === 2) {
-		const firstTouch = new Vector(evCache[0].clientX, evCache[0].clientY);
-		const secondTouch = new Vector(evCache[1].clientX, evCache[1].clientY);
-		const diff = firstTouch.sub(secondTouch).length();
-		const neededDistance = 13;
-		if (previousEvDistance > 0) {
-			if (diff > previousEvDistance + neededDistance) {
-				zoomIn();
-			}
 
-			if (diff < previousEvDistance - neededDistance) {
-				zoomOut();
-			}
-		}
-		previousEvDistance = diff;
-	}
-});
-document.addEventListener("wheel", (event) => {
-	if (event.deltaY < 0) {
-		zoomIn();
-	} else {
-		zoomOut();
-	}
-});
+
 init();
 // The main game loop
 (() => {
-	function main(tFrame) {
+	function main(tFrame: number) {
 		window.requestAnimationFrame(main);
+		if (!ctx) {
+			throw new Error("Main loop: 2D context not found");
+		}
 		if (gameState === 0) {
 			renderStart(ctx);
 		} else if (gameState === 1) {
@@ -796,5 +775,5 @@ init();
 		}
 	}
 
-	main();
+	main(0);
 })();
