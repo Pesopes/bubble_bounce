@@ -145,7 +145,8 @@ export class Button {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = `${Math.floor(this.dim.y / 3)}px "verdana", sans-serif`;
-    const fontMeasurement = ctx.measureText(this.text);
+    // somehow use this to make sure the text fits
+    // const fontMeasurement = ctx.measureText(this.text);
     const center = this.getCenter();
     ctx.fillText(this.text, center.x, center.y, this.dim.x);
   }
