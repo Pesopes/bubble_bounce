@@ -91,7 +91,6 @@ export class InputManager {
 
     }
     private handleWheel(e: WheelEvent) {
-        e.preventDefault();
         this.callbacks.onScroll(e.deltaY);
     }
 
