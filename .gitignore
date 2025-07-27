@@ -1,21 +1,30 @@
-# Node.js dependencies
+# Vite build output
+dist/
+.vite/
+
+# Node modules
 node_modules/
 
-# Generated files
-dist/
-build/
-*.log
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Environment variables
-.env
+# OS junk
+.DS_Store
+Thumbs.db
 
-# IDE/Editor specific files
+# Editor junk
 .vscode/
 .idea/
-*.code-workspace
+*.swp
 
-# macOS specific files
-.DS_Store
+# TypeScript
+*.tsbuildinfo
 
-# Windows specific files
-Thumbs.db
+# Env files
+.env
+.env.*
+
+# Optional: coverage

@@ -1,3 +1,5 @@
+import { Vector } from "./lib.js";
+
 const canvas = document.getElementById("main-canvas");
 const ctx = canvas.getContext("2d");
 
@@ -362,7 +364,7 @@ class Bubble {
 			// Calculate the velocity change based on the relative velocity and masses
 			const velocityChange = collisionNormal.mult(
 				(2 * relativeVelocity.dot(collisionNormal)) /
-					(this.mass() + other.mass()),
+				(this.mass() + other.mass()),
 			);
 
 			// Apply velocity change to the velocities of both balls
@@ -551,9 +553,8 @@ function prepareStart() {
 	// CHANGE BALL COUNT BUTTONS
 	const startingBallCountRatio =
 		smallBallCount / presetBallCounts[presetBallCounts.length - 1];
-	const ballCountColor = `rgb(${
-		-startingBallCountRatio * 100 + 200
-	}, ${233}, ${203})`;
+	const ballCountColor = `rgb(${-startingBallCountRatio * 100 + 200
+		}, ${233}, ${203})`;
 	buttons.push(
 		new Button(
 			new Vector(
@@ -669,9 +670,9 @@ function prepareBoard() {
 			const size = 230 + 170 * Math.random();
 			const midBlockPos = new Vector(
 				sideBlockOffset +
-					sideBlockDim.x +
-					Math.random() *
-						(canvas.width - size - 2 * (sideBlockOffset + sideBlockDim.x)),
+				sideBlockDim.x +
+				Math.random() *
+				(canvas.width - size - 2 * (sideBlockOffset + sideBlockDim.x)),
 				(canvas.height - sideBlockDim.x) / 2,
 			);
 			blocks.push(new Block(midBlockPos, new Vector(size, sideBlockDim.x)));
@@ -680,24 +681,24 @@ function prepareBoard() {
 			const size2 = 100 + 50 * Math.random();
 			const firstMidBlockPos = new Vector(
 				sideBlockOffset +
-					sideBlockDim.x +
-					Math.random() *
-						(canvas.width -
-							size1 -
-							size2 -
-							2 * (sideBlockOffset + sideBlockDim.x)),
+				sideBlockDim.x +
+				Math.random() *
+				(canvas.width -
+					size1 -
+					size2 -
+					2 * (sideBlockOffset + sideBlockDim.x)),
 				(canvas.height - sideBlockDim.x) / 2,
 			);
 			const secondMidBlockPos = new Vector(
 				firstMidBlockPos.x +
-					size1 +
-					Math.random() *
-						(canvas.width -
-							size1 -
-							size2 -
-							firstMidBlockPos.x -
-							sideBlockOffset -
-							sideBlockDim.x),
+				size1 +
+				Math.random() *
+				(canvas.width -
+					size1 -
+					size2 -
+					firstMidBlockPos.x -
+					sideBlockOffset -
+					sideBlockDim.x),
 				(canvas.height - sideBlockDim.x) / 2,
 			);
 			blocks.push(
@@ -762,7 +763,7 @@ function spawnPlayerBalls(center, playerSprite, playerNum, top) {
 	);
 	bubbles.push(newBub);
 	// Medium balls in front of big one
-	for (i = 0; i <= 5; i++) {
+	for (let i = 0; i <= 5; i++) {
 		bubbles.push(
 			new Bubble(
 				new Vector(
@@ -894,7 +895,7 @@ function update(tFrame) {
 	// (almost) no movement => other player can play
 	if (allStopped() && isWaiting) {
 		// Simulate 1000 frames so you don't have to wait for everything to completely stop
-		for (i = 0; i < 1000; i++) {
+		for (let i = 0; i < 1000; i++) {
 			updateAllBubbles();
 		}
 		isWaiting = false;
@@ -920,7 +921,7 @@ function render(ctx) {
 	// Lines between nearby bubbles
 	if (renderLinesBetween) {
 		const maxDistance = 600;
-		for (pn = 1; pn <= 2; pn++) {
+		for (let pn = 1; pn <= 2; pn++) {
 			const playerBubbles = bubbles.filter((b) => b.player === pn);
 			playerBubbles.forEach((b1, i) => {
 				for (const b2 of playerBubbles.slice(i + 1)) {
@@ -939,7 +940,7 @@ function render(ctx) {
 	}
 
 	// Render objects using their functions
-	for (bub of bubbles) {
+	for (const bub of bubbles) {
 		bub.render(ctx);
 	}
 
@@ -1124,7 +1125,7 @@ document.addEventListener("pointerup", (e) => {
 			.normalize()
 			.mult(
 				(Math.min(dirVec.length(), maxVelocityLen) / maxVelocityLen) *
-					fireForce,
+				fireForce,
 			);
 		clickedBub = null;
 		switchPlayer();
