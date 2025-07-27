@@ -1,0 +1,21 @@
+# Node.js dependencies
+node_modules/
+
+# Generated files
+dist/
+build/
+*.log
+
+# Environment variables
+.env
+
+# IDE/Editor specific files
+.vscode/
+.idea/
+*.code-workspace
+
+# macOS specific files
+.DS_Store
+
+# Windows specific files
+Thumbs.db

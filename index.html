@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Bubble bounce</title>
+    <link rel="icon" href="/bubble_bounce/favicon.png" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            touch-action:none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* background-image: url("./abstract_dots.svg"); */
+            background-color:#2a2424ff;
+            background-size: cover;
+            }
+        canvas {
+            width: 100%;
+            max-height: 95vh;
+            border-radius: 40px;
+            filter: drop-shadow(6px 6px 7px black);
+            transition: transform 0.3s;
+        }
+
+    </style>
+  <script type="module" crossorigin src="/bubble_bounce/assets/index-CMRefaM2.js"></script>
+</head>
+<body>
+    <canvas id="main-canvas">
+        This is the main canvas where the content is. If you see this text your browser cannot load it. Try a different browser or a different device.
+    </canvas>
+</body>
+</html>
