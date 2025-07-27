@@ -10,4 +10,5 @@ The concept is based on one of the mini-games in the game called **Shmatoosto** 
 
 ## Notes
 
-The require bounce option is not actually implemented and does nothing.
+- You can scroll/pinch to zoom in and out the board. This is useful for making fully charged shots in some situations.
+- The require bounce option is not actually implemented and does nothing.
