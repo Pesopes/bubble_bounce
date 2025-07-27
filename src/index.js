@@ -1,4 +1,19 @@
 import { Vector } from "./lib.js";
+import backgroundImageSrc from "./assets/abstract_dots.svg";
+
+const ballSpriteModules = import.meta.glob("./assets/balls/*.png", {
+	eager: true,
+	as: "url",
+});
+const ballSprites = Object.fromEntries(
+	Object.entries(ballSpriteModules).map(([path, url]) => {
+		const ballNumber = path.match(/(\d+)\.png$/)[1];
+		const img = new Image();
+		img.src = url;
+
+		return [ballNumber, img];
+	}),
+);
 
 const canvas = document.getElementById("main-canvas");
 const ctx = canvas.getContext("2d");
@@ -51,12 +66,8 @@ const fireForce = 18;
 
 const backgroundImage = new Image();
 
-// These are the "names" of sprites that will be used
-// Since I named the sprites using numbers I just generate an array of numbers and then filter out the sprites I don't want
-const availableSprites = Array.from(new Array(32), (x, i) => i + 1).filter(
-	(s) => s !== 9 && s !== 14 && s !== 15,
-);
-backgroundImage.src = "./abstract_dots.svg";
+
+backgroundImage.src = backgroundImageSrc;
 let clickedBub = null;
 
 // Static obstacles for bubbles
@@ -150,12 +161,11 @@ class Bubble {
 	rot;
 	player;
 	bouncedOffWall;
-	constructor(pos, radius, velocity, spriteSrc, player = 0) {
+	constructor(pos, radius, velocity, spriteImg, player = 0) {
 		this.pos = pos;
 		this.radius = radius;
 		this.velocity = velocity;
-		this.sprite = new Image();
-		this.sprite.src = spriteSrc || "./balls/2.png";
+		this.sprite = spriteImg || getBallSprite(2);
 		this.rotSpeed = 0;
 		this.player = player;
 	}
@@ -436,9 +446,16 @@ const isColliding = (testBub) => {
 	}
 	return false;
 };
-// Converts a number to sprite path 
-function getSprite(num) {
-	return `./balls/${availableSprites[num]}.png`;
+function getBallSprite(index) {
+	return Object.values(ballSprites)[index] || ballSprites["1"];
+}
+// Returns the sprite image based on the image name 
+function getBallSpriteByName(num) {
+	return ballSprites[num.toString()] || ballSprites["1"];
+}
+
+function getRandomBallSpriteIdx() {
+	return Math.floor(Math.random() * Object.keys(ballSprites).length);
 }
 // Generic draw image
 function drawImage(ctx, img, pos, scale, rotation) {
@@ -586,21 +603,21 @@ function prepareStart() {
 	const previewBubbleOffset = 200;
 	// Get random starting sprites that are different to each other
 	if (chosenSprites.length === 0) {
-		chosenSprites[0] = Math.floor(Math.random() * availableSprites.length);
+		chosenSprites[0] = getRandomBallSpriteIdx();
 		do {
-			chosenSprites[1] = Math.floor(Math.random() * availableSprites.length);
+			chosenSprites[1] = getRandomBallSpriteIdx();
 		} while (chosenSprites[0] === chosenSprites[1]);
 	}
 
 	// Do for both players
 	for (let i = 0; i <= 1; i++) {
-		const sign = i * 2 - 1; // p1=>-1;p2=>1
+		const sign = i * 2 - 1; // changes based on player: p1=>-1, p2=>1
 		previewBubbles.push(
 			new Bubble(
 				previewPosCenter.add(new Vector(sign * previewBubbleOffset, 0)),
 				bigBallSize,
 				new Vector(),
-				getSprite(chosenSprites[i]),
+				getBallSprite(chosenSprites[i]),
 				i + 1,
 			),
 		);
@@ -615,10 +632,10 @@ function prepareStart() {
 				previewButtonSwitchDim,
 				"<",
 				(but) => {
-					chosenSprites[i] = (chosenSprites[i] - 1) % availableSprites.length;
+					chosenSprites[i] = (chosenSprites[i] - 1) % Object.keys(ballSprites).length;
 					if (chosenSprites[i] < 0)
-						chosenSprites[i] = availableSprites.length - 1;
-					previewBubbles[i].sprite.src = getSprite(chosenSprites[i]);
+						chosenSprites[i] = Object.keys(ballSprites).length - 1;
+					previewBubbles[i].sprite = getBallSprite(chosenSprites[i]);
 				},
 
 				previewButtonColor,
@@ -636,8 +653,8 @@ function prepareStart() {
 				previewButtonSwitchDim,
 				">",
 				(but) => {
-					chosenSprites[i] = (chosenSprites[i] + 1) % availableSprites.length;
-					previewBubbles[i].sprite.src = getSprite(chosenSprites[i]);
+					chosenSprites[i] = (chosenSprites[i] + 1) % Object.keys(ballSprites).length;
+					previewBubbles[i].sprite = getBallSprite(chosenSprites[i]);
 				},
 
 				previewButtonColor,
@@ -815,8 +832,8 @@ function init() {
 		canvas.width / 2,
 		canvas.height - distanceFromSide,
 	);
-	spawnPlayerBalls(topPlayerCenter, getSprite(chosenSprites[0]), 1, true);
-	spawnPlayerBalls(bottomPlayerCenter, getSprite(chosenSprites[1]), 2, false);
+	spawnPlayerBalls(topPlayerCenter, getBallSprite(chosenSprites[0]), 1, true);
+	spawnPlayerBalls(bottomPlayerCenter, getBallSprite(chosenSprites[1]), 2, false);
 }
 function resetGame() {
 	gameState = 0;
@@ -975,7 +992,7 @@ function render(ctx) {
 			ctx.strokeStyle = "rgb(120 0 0)";
 		}
 		const lengthRatio = vecBetween.length() / maxVelocityLen;
-		end = bubPos.add(vecBetween.mult(chargeDir));
+		let end = bubPos.add(vecBetween.mult(chargeDir));
 		ctx.beginPath();
 		ctx.setLineDash([5 + 5 * lengthRatio, 17 * lengthRatio]);
 		ctx.lineWidth = 6;
@@ -1024,9 +1041,7 @@ function renderStart(ctx) {
 	ctx.font = 'bold 100px "Helvetica", sans-serif';
 	ctx.fillText("Bubble Bounce", canvas.width / 2, canvas.height / 8);
 }
-function randomFromArray(arr) {
-	return arr[Math.floor(Math.random() * arr.length)];
-}
+
 function raycastSphere(from, to, radius, exclude, steps = 100) {
 	const dir = to.sub(from);
 	const testBub = new Bubble(new Vector(), radius);
@@ -1172,7 +1187,6 @@ init();
 (() => {
 	function main(tFrame) {
 		window.requestAnimationFrame(main);
-
 		if (gameState === 0) {
 			renderStart(ctx);
 		} else if (gameState === 1) {
