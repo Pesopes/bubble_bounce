@@ -3,7 +3,8 @@ import backgroundImageSrc from "./assets/abstract_dots.svg";
 
 const ballSpriteModules = import.meta.glob("./assets/balls/*.png", {
 	eager: true,
-	as: "url",
+	query: "?url",
+	import: "default",
 });
 const ballSprites = Object.fromEntries(
 	Object.entries(ballSpriteModules).map(([path, url]) => {
