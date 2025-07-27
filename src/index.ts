@@ -489,7 +489,7 @@ function init() {
 		onResize: () => { resizeCanvas() }
 	}
 
-	const inputManager = new InputManager(canvas, gameCallbacks);
+	new InputManager(canvas, gameCallbacks);
 }
 function resetGame() {
 	gameState = 0;
