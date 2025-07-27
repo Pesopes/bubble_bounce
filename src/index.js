@@ -528,21 +528,21 @@ function render(ctx) {
 	// Lines between nearby bubbles
 	if (renderLinesBetween) {
 		const maxDistance = 600;
+		ctx.lineWidth = 2;
 		for (let pn = 1; pn <= 2; pn++) {
 			const playerBubbles = bubbles.filter((b) => b.player === pn);
+			ctx.beginPath();
+			ctx.strokeStyle = `rgba(0, 0, 0, ${0.2})`;
 			playerBubbles.forEach((b1, i) => {
 				for (const b2 of playerBubbles.slice(i + 1)) {
 					const distance = b1.pos.sub(b2.pos).length();
 					if (distance <= maxDistance) {
-						ctx.beginPath();
-						ctx.strokeStyle = `rgba(0, 0, 0, ${1 - distance / maxDistance})`;
-						ctx.lineWidth = 1;
 						ctx.moveTo(Math.floor(b1.pos.x), Math.floor(b1.pos.y));
 						ctx.lineTo(Math.floor(b2.pos.x), Math.floor(b2.pos.y));
-						ctx.stroke();
 					}
 				}
 			});
+			ctx.stroke();
 		}
 	}
 
