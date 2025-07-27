@@ -651,7 +651,7 @@ function raycastSphere(from, to, radius, exclude, steps = 100) {
 		for (let bi = 0; bi < bubbles.length; bi++) {
 			const otherBub = bubbles[bi];
 			if (
-				JSON.stringify(otherBub) !== JSON.stringify(exclude) &&
+				otherBub !== exclude &&
 				testBub.isCollidingBubble(otherBub)
 			) {
 				return testBub.pos.mult(1);
