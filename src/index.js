@@ -1,4 +1,4 @@
-import { Vector } from "./lib.js";
+import { Vector, Bubble, Block, Button, drawCircle } from "./lib.js";
 import backgroundImageSrc from "./assets/abstract_dots.svg";
 
 const ballSpriteModules = import.meta.glob("./assets/balls/*.png", {
@@ -57,10 +57,7 @@ let chosenSprites = [];
 let renderLinesBetween = true;
 let chargeDir = -1;
 
-// Physics settings
-const gravity = 0.0;
-const drag = 0.992;
-const damping = 0.96;
+
 
 const fireForce = 18;
 
@@ -70,368 +67,7 @@ const backgroundImage = new Image();
 backgroundImage.src = backgroundImageSrc;
 let clickedBub = null;
 
-// Static obstacles for bubbles
-class Block {
-	pos;
-	dim;
-	borderRadius;
-	constructor(pos, dim, borderRadius = 1) {
-		this.pos = pos;
-		this.dim = dim;
-		this.borderRadius = borderRadius;
-	}
-	getCenter() {
-		return this.pos.add(this.dim.div(2));
-	}
-	render(ctx) {
-		ctx.fillStyle = "F0EBE3";
-		drawRoundedRect(
-			ctx,
-			// Optimize
-			Math.floor(this.pos.x),
-			Math.floor(this.pos.y),
-			this.dim.x,
-			this.dim.y,
-			this.borderRadius + 15,
-		);
-	}
-}
 
-// Clickable rectangle
-class Button {
-	pos;
-	dim;
-	onClick;
-	text;
-	color;
-	borderRadius;
-	constructor(pos, dim, text, onClick, color = "red", borderRadius = 55) {
-		this.pos = pos;
-		this.dim = dim;
-		this.text = text;
-		this.onClick = onClick;
-		this.color = color;
-		this.borderRadius = borderRadius;
-	}
-	getCenter() {
-		return this.pos.add(this.dim.div(2));
-	}
-	isInside(checkPos) {
-		return (
-			checkPos.x >= this.pos.x &&
-			checkPos.x <= this.pos.x + this.dim.x &&
-			checkPos.y >= this.pos.y &&
-			checkPos.y <= this.pos.y + this.dim.y
-		);
-	}
-	// If is vec in bounds call onClick
-	checkClick(pos = mousePos) {
-		if (this.isInside(pos)) {
-			this.onClick(this);
-		}
-	}
-	render(ctx) {
-		ctx.fillStyle = this.color;
-		drawRoundedRect(
-			ctx,
-			// Optimize
-			Math.floor(this.pos.x),
-			Math.floor(this.pos.y),
-			this.dim.x,
-			this.dim.y,
-			this.borderRadius,
-		);
-		ctx.fillStyle = "black";
-		ctx.textAlign = "center";
-		ctx.textBaseline = "middle";
-		ctx.font = `${Math.floor(this.dim.y / 3)}px "verdana", sans-serif`;
-		const fontMeasurement = ctx.measureText(this.text);
-		const center = this.getCenter();
-		ctx.fillText(this.text, center.x, center.y, this.dim.x);
-	}
-}
-
-// Moving balls that you play with
-class Bubble {
-	pos;
-	radius;
-	velocity;
-	sprite;
-	rotSpeed;
-	rot;
-	player;
-	bouncedOffWall;
-	constructor(pos, radius, velocity, spriteImg, player = 0) {
-		this.pos = pos;
-		this.radius = radius;
-		this.velocity = velocity;
-		this.sprite = spriteImg || getBallSprite(2);
-		this.rotSpeed = 0;
-		this.player = player;
-	}
-
-	mass() {
-		return (Math.PI * this.radius * this.radius) / 100;
-	}
-
-	kineticEnergy() {
-		return (this.mass() / 2) * this.velocity.squared();
-	}
-
-	bounce() {
-		if (this.pos.x - this.radius <= 0) {
-			this.velocity.x *= -damping;
-			this.pos.x = this.radius;
-		}
-		if (this.pos.x + this.radius >= canvas.width) {
-			this.velocity.x *= -damping;
-			this.pos.x = canvas.width - this.radius;
-		}
-		if (this.pos.y - this.radius <= 0) {
-			this.velocity.y *= -damping;
-			this.pos.y = this.radius;
-		}
-		if (this.pos.y + this.radius >= canvas.height) {
-			this.velocity.y *= -damping;
-			this.pos.y = canvas.height - this.radius;
-		}
-	}
-	// If the ball is mostly outside (there's some leeway)
-	outOfBounds() {
-		const safeDistance = this.radius + this.radius / 3;
-		if (
-			this.pos.x - this.radius + safeDistance <= 0 ||
-			this.pos.x + this.radius - safeDistance >= canvas.width ||
-			this.pos.y - this.radius + safeDistance <= 0 ||
-			this.pos.y + this.radius - safeDistance >= canvas.height
-		) {
-			//TODO: death animation
-			return true;
-		}
-		return false;
-	}
-	isCollidingBubble(other) {
-		const vec = this.pos.sub(other.pos);
-		const minDistance = this.radius + other.radius;
-		const distance = vec.length();
-		return distance <= minDistance;
-	}
-	// Unnecessary code copying from collision resolution (TODO: fix)
-	isCollidingBlock(block) {
-		const borderRadius = block.borderRadius;
-		let collisionDetected = false;
-		let normal = new Vector(0, 0);
-		let penetrationDepth = 0;
-
-		// Check collision with rectangle edges (excluding corners)
-		const px = Math.max(
-			block.pos.x + borderRadius,
-			Math.min(this.pos.x, block.pos.x + block.dim.x - borderRadius),
-		);
-		const py = Math.max(
-			block.pos.y + borderRadius,
-			Math.min(this.pos.y, block.pos.y + block.dim.y - borderRadius),
-		);
-		const collisionPoint = new Vector(px, py);
-		const dist = this.pos.sub(collisionPoint).length();
-
-		if (dist <= this.radius) {
-			collisionDetected = true;
-
-			// Determine the collision normal for edges
-			if (px === block.pos.x + borderRadius) {
-				normal = new Vector(-1, 0); // Left edge
-			} else if (px === block.pos.x + block.dim.x - borderRadius) {
-				normal = new Vector(1, 0); // Right edge
-			} else if (py === block.pos.y + borderRadius) {
-				normal = new Vector(0, -1); // Top edge
-			} else if (py === block.pos.y + block.dim.y - borderRadius) {
-				normal = new Vector(0, 1); // Bottom edge
-			}
-
-			penetrationDepth = this.radius - dist;
-		}
-
-		// Check collision with rectangle corners
-		const corners = [
-			new Vector(block.pos.x + borderRadius, block.pos.y + borderRadius), // Top-left
-			new Vector(
-				block.pos.x + block.dim.x - borderRadius,
-				block.pos.y + borderRadius,
-			), // Top-right
-			new Vector(
-				block.pos.x + borderRadius,
-				block.pos.y + block.dim.y - borderRadius,
-			), // Bottom-left
-			new Vector(
-				block.pos.x + block.dim.x - borderRadius,
-				block.pos.y + block.dim.y - borderRadius,
-			), // Bottom-right
-		];
-
-		for (const corner of corners) {
-			const cornerDist = this.pos.sub(corner).length();
-			if (cornerDist <= this.radius + borderRadius) {
-				collisionDetected = true;
-				normal = this.pos.sub(corner).normalize();
-				penetrationDepth = this.radius + borderRadius - cornerDist;
-				break;
-			}
-		}
-
-		return collisionDetected;
-	}
-	// BUG: collision with sides is offset by borderRadius (especially visible with a high borderRadius)
-	// Handle collision with a Block
-	collideBlock(block) {
-		const borderRadius = block.borderRadius;
-		let collisionDetected = false;
-		let normal = new Vector(0, 0);
-		let penetrationDepth = 0;
-
-		// Check collision with rectangle edges (excluding corners)
-		const px = Math.max(
-			block.pos.x + borderRadius,
-			Math.min(this.pos.x, block.pos.x + block.dim.x - borderRadius),
-		);
-		const py = Math.max(
-			block.pos.y + borderRadius,
-			Math.min(this.pos.y, block.pos.y + block.dim.y - borderRadius),
-		);
-		const collisionPoint = new Vector(px, py);
-		const dist = this.pos.sub(collisionPoint).length();
-
-		if (dist <= this.radius) {
-			collisionDetected = true;
-
-			// Determine the collision normal for edges
-			if (px === block.pos.x + borderRadius) {
-				normal = new Vector(-1, 0); // Left edge
-			} else if (px === block.pos.x + block.dim.x - borderRadius) {
-				normal = new Vector(1, 0); // Right edge
-			} else if (py === block.pos.y + borderRadius) {
-				normal = new Vector(0, -1); // Top edge
-			} else if (py === block.pos.y + block.dim.y - borderRadius) {
-				normal = new Vector(0, 1); // Bottom edge
-			}
-
-			penetrationDepth = this.radius - dist;
-		}
-
-		// Check collision with rectangle corners
-		const corners = [
-			new Vector(block.pos.x + borderRadius, block.pos.y + borderRadius), // Top-left
-			new Vector(
-				block.pos.x + block.dim.x - borderRadius,
-				block.pos.y + borderRadius,
-			), // Top-right
-			new Vector(
-				block.pos.x + borderRadius,
-				block.pos.y + block.dim.y - borderRadius,
-			), // Bottom-left
-			new Vector(
-				block.pos.x + block.dim.x - borderRadius,
-				block.pos.y + block.dim.y - borderRadius,
-			), // Bottom-right
-		];
-
-		for (const corner of corners) {
-			const cornerDist = this.pos.sub(corner).length();
-			if (cornerDist <= this.radius + borderRadius) {
-				collisionDetected = true;
-				normal = this.pos.sub(corner).normalize();
-				penetrationDepth = this.radius + borderRadius - cornerDist;
-				break;
-			}
-		}
-
-		if (collisionDetected) {
-			// Correct the position by moving the circle back along the normal
-			this.pos = this.pos.add(normal.mult(penetrationDepth));
-
-			// Reflect the velocityocity
-			const dotProduct = this.velocity.dot(normal);
-			this.velocity = this.velocity.sub(normal.mult(2 * dotProduct));
-
-			// Optionally, apply a damping factor to simultate energy loss
-			this.velocity = this.velocity.mult(damping);
-
-			this.bouncedOffWall = true;
-		}
-	}
-	// Handle collision with another Bubble
-	collideBubble(other) {
-		const vec = this.pos.sub(other.pos);
-		const minDistance = this.radius + other.radius;
-		const distance = vec.length();
-		if (distance <= minDistance) {
-			//my collision sucked so chatGPT wrote this
-			const collisionNormal = vec.normalize();
-
-			// Calculate relative velocity
-			const relativeVelocity = this.velocity.sub(other.velocity);
-
-			// Calculate the velocity change based on the relative velocity and masses
-			const velocityChange = collisionNormal.mult(
-				(2 * relativeVelocity.dot(collisionNormal)) /
-				(this.mass() + other.mass()),
-			);
-
-			// Apply velocity change to the velocities of both balls
-			this.velocity = this.velocity.sub(velocityChange.mult(other.mass()));
-			other.velocity = other.velocity.add(velocityChange.mult(this.mass()));
-
-			// Separate the balls to avoid overlap
-			const overlap = minDistance - distance;
-			const separation = collisionNormal.mult(overlap / 2);
-			this.pos = this.pos.add(separation);
-			other.pos = other.pos.sub(separation);
-
-			//Eye candy - rotation
-			const rotDiff = velocityChange
-				.normalize()
-				.dot(new Vector(-this.velocity.y, this.velocity.x).normalize());
-			this.rotSpeed = rotDiff / 100;
-			other.rotSpeed = rotDiff / 100;
-		}
-	}
-
-	update() {
-		// this.bounce();
-		this.velocity.y += gravity * this.mass();
-		this.velocity = this.velocity.mult(drag);
-		this.rotSpeed *= drag;
-		this.rot += this.rotSpeed;
-		this.pos = this.pos.add(this.velocity);
-	}
-
-	render(ctx) {
-		//TODO: color
-		// drawCircle(ctx,this.pos, this.radius)
-		// ctx.fillStyle = "rgb(200 0 0)";
-		this.rot = this.rot || Math.PI * 2 * Math.random();
-
-		if (this.player === currentPlayer && !isWaiting) {
-			ctx.fillStyle = "rgba(0,0,0,0.3)";
-			drawCircle(
-				ctx,
-				this.pos,
-				this.radius + this.radius * 0.3 * Math.abs(Math.sin(frame / 500)),
-			);
-		}
-		drawImage(ctx, this.sprite, this.pos, this.radius * 2, this.rot);
-	}
-
-	simpleRender(ctx) {
-		ctx.fillStyle = color;
-		drawCircle(ctx, this.pos, this.radius);
-	}
-
-	isInside(pos) {
-		const dist = pos.sub(this.pos).length();
-		return dist <= this.radius;
-	}
-}
 
 const isColliding = (testBub) => {
 	for (const block of blocks) {
@@ -457,53 +93,7 @@ function getBallSpriteByName(num) {
 function getRandomBallSpriteIdx() {
 	return Math.floor(Math.random() * Object.keys(ballSprites).length);
 }
-// Generic draw image
-function drawImage(ctx, img, pos, scale, rotation) {
-	ctx.save();
-	ctx.translate(Math.floor(pos.x), Math.floor(pos.y));
-	ctx.rotate(rotation);
-	ctx.drawImage(img, -scale / 2, -scale / 2, scale, scale);
-	ctx.restore();
-}
-// Generic draw circle
-function drawCircle(ctx, pos, radius) {
-	ctx.beginPath();
-	ctx.arc(Math.floor(pos.x), Math.floor(pos.y), radius, 0, Math.PI * 2);
-	ctx.fill();
-}
 
-// Generic draw rounded rect
-function drawRoundedRect(ctx, x, y, width, height, borderRadius) {
-	// Begin path
-	ctx.strokeStyle = "rgba(0, 0, 0, 1.0)";
-	ctx.lineWidth = 6;
-	ctx.beginPath();
-	// Top side
-	ctx.moveTo(x + borderRadius, y);
-	ctx.lineTo(x + width - borderRadius, y);
-	// Top right corner
-	ctx.arcTo(x + width, y, x + width, y + borderRadius, borderRadius);
-	// Right side
-	ctx.lineTo(x + width, y + height - borderRadius);
-	// Bottom right corner
-	ctx.arcTo(
-		x + width,
-		y + height,
-		x + width - borderRadius,
-		y + height,
-		borderRadius,
-	);
-	// Bottom side
-	ctx.lineTo(x + borderRadius, y + height);
-	// Bottom left corner
-	ctx.arcTo(x, y + height, x, y + height - borderRadius, borderRadius);
-	// Left side
-	ctx.lineTo(x, y + borderRadius);
-	// Top left corner
-	ctx.arcTo(x, y, x + borderRadius, y, borderRadius);
-	ctx.stroke();
-	ctx.fill();
-}
 
 // Create the main menu elements
 function prepareStart() {
@@ -907,7 +497,7 @@ function updateAllBubbles() {
 function update(tFrame) {
 	frame = tFrame;
 	// Delete bubbles out of bounds
-	bubbles = bubbles.filter((b) => !b.outOfBounds());
+	bubbles = bubbles.filter((b) => !b.outOfBounds(canvas.width, canvas.height));
 	updateAllBubbles();
 	// (almost) no movement => other player can play
 	if (allStopped() && isWaiting) {
@@ -957,8 +547,16 @@ function render(ctx) {
 	}
 
 	// Render objects using their functions
-	for (const bub of bubbles) {
-		bub.render(ctx);
+	for (const bubble of bubbles) {
+		if (bubble.player === currentPlayer && !isWaiting) {
+			ctx.fillStyle = "rgba(0,0,0,0.3)";
+			drawCircle(
+				ctx,
+				bubble.pos,
+				bubble.radius + bubble.radius * 0.15 * (Math.sin(frame / 250) + 1),
+			);
+		}
+		bubble.render(ctx);
 	}
 
 	// Dragging line and hit indicator
