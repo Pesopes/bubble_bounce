@@ -96,9 +96,9 @@ function getBallSprite(index: number) {
 	return Object.values(ballSprites)[index] || ballSprites["1"];
 }
 // Returns the sprite image based on the image name 
-function getBallSpriteByName(num: number) {
-	return ballSprites[num.toString()] || ballSprites["1"];
-}
+// function getBallSpriteByName(num: number) {
+// 	return ballSprites[num.toString()] || ballSprites["1"];
+// }
 
 function getRandomBallSpriteIdx() {
 	return Math.floor(Math.random() * Object.keys(ballSprites).length);

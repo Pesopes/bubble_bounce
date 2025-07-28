@@ -204,8 +204,6 @@ export class Bubble {
   isCollidingBlock(block: Block) {
     const borderRadius = block.borderRadius;
     let collisionDetected = false;
-    let normal = new Vector(0, 0);
-    let penetrationDepth = 0;
 
     // Check collision with rectangle edges (excluding corners)
     const px = Math.max(
@@ -221,19 +219,6 @@ export class Bubble {
 
     if (dist <= this.radius) {
       collisionDetected = true;
-
-      // Determine the collision normal for edges
-      if (px === block.pos.x + borderRadius) {
-        normal = new Vector(-1, 0); // Left edge
-      } else if (px === block.pos.x + block.dim.x - borderRadius) {
-        normal = new Vector(1, 0); // Right edge
-      } else if (py === block.pos.y + borderRadius) {
-        normal = new Vector(0, -1); // Top edge
-      } else if (py === block.pos.y + block.dim.y - borderRadius) {
-        normal = new Vector(0, 1); // Bottom edge
-      }
-
-      penetrationDepth = this.radius - dist;
     }
 
     // Check collision with rectangle corners
@@ -257,8 +242,6 @@ export class Bubble {
       const cornerDist = this.pos.sub(corner).length();
       if (cornerDist <= this.radius + borderRadius) {
         collisionDetected = true;
-        normal = this.pos.sub(corner).normalize();
-        penetrationDepth = this.radius + borderRadius - cornerDist;
         break;
       }
     }
