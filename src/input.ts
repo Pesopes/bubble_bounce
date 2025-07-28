@@ -1,5 +1,7 @@
 import { Vector } from "./lib";
 
+// Bug: On PC you can right click and bug out the events such that you can do the pinch (and can't get rid of it)
+
 export interface GameInputCallbacks {
     onPointerDown: (pos: Vector) => void;
     onPointerUp: (pos: Vector) => void;
@@ -14,6 +16,7 @@ export class InputManager {
     private callbacks: GameInputCallbacks;
     private evCache: PointerEvent[] = [];
     private previousEvDistance = -1;
+    private keyListeners: Map<string, () => void> = new Map();
 
     constructor(canvas: HTMLCanvasElement, callbacks: GameInputCallbacks) {
         this.canvas = canvas;
@@ -24,6 +27,17 @@ export class InputManager {
         document.addEventListener("pointerup", this.handlePointerUp.bind(this));
         document.addEventListener("pointermove", this.handlePointerMove.bind(this));
         document.addEventListener("wheel", this.handleWheel.bind(this));
+        document.addEventListener("keydown", this.handleKeyDown.bind(this));
+    }
+
+    /**
+     * Registers a callback for a specific key press.
+     * @param key The key to listen for (e.g., 'f', 'F1', ' ').
+     * @param callback The function to execute when the key is pressed.
+     */
+    public onKey(key: string, callback: () => void) {
+        this.keyListeners.set(key, callback);
+        return this; // Allow chaining
     }
 
     private removeEvent(ev: PointerEvent) {
@@ -92,6 +106,14 @@ export class InputManager {
     }
     private handleWheel(e: WheelEvent) {
         this.callbacks.onScroll(e.deltaY);
+    }
+
+    private handleKeyDown(e: KeyboardEvent) {
+        const callback = this.keyListeners.get(e.key);
+        if (callback) {
+            e.preventDefault();
+            callback();
+        }
     }
 
 }
