@@ -882,10 +882,19 @@ function renderStart(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingCon
 		previewBubble.render(ctx, getBallSprite(previewBubble.spriteIndex));
 	}
 
+	// Player labels for preview bubbles
+	const previewPosCenter = new Vector(canvas.width / 2, 300);
+	const previewBubbleOffset = 200;
+
 	ctx.fillStyle = "black";
 	ctx.textAlign = "center";
+	ctx.font = 'bold 40px "Helvetica", sans-serif';
+
+	ctx.fillText("P2:", previewPosCenter.x - previewBubbleOffset, previewPosCenter.y - bigBallSize - 20);
+	ctx.fillText("P1:", previewPosCenter.x + previewBubbleOffset, previewPosCenter.y - bigBallSize - 20);
+
 	ctx.font = 'bold 100px "Helvetica", sans-serif';
-	ctx.fillText("Bubble Bounce", canvas.width / 2, canvas.height / 10);
+	ctx.fillText("Bubble Bounce", canvas.width / 2, canvas.height / 12);
 }
 
 // TODO: make exclude an array and optional
