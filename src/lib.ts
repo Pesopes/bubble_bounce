@@ -1,11 +1,16 @@
 import { gravity, damping, drag } from "./constants";
 
+
 export class Vector {
   x;
   y;
   constructor(x = 0, y = 0) {
     this.x = x;
     this.y = y;
+  }
+
+  clone() {
+    return new Vector(this.x, this.y);
   }
 
   squared() {
@@ -79,6 +84,9 @@ export class Block {
     this.pos = pos;
     this.dim = dim;
     this.borderRadius = borderRadius;
+  }
+  clone() {
+    return new Block(this.pos.clone(), this.dim.clone(), this.borderRadius);
   }
   getCenter() {
     return this.pos.add(this.dim.div(2));
@@ -157,18 +165,32 @@ export class Bubble {
   pos;
   radius;
   velocity;
-  sprite;
+  spriteIndex;
   rotSpeed;
   rot: number = 0;
   player;
   bouncedOffWall: boolean = false;
-  constructor(pos: Vector, radius: number, velocity: Vector, spriteImg: HTMLImageElement, player = 0) {
+  constructor(pos: Vector, radius: number, velocity: Vector, spriteIndex: number, player = 0) {
     this.pos = pos;
     this.radius = radius;
     this.velocity = velocity;
-    this.sprite = spriteImg;
+    this.spriteIndex = spriteIndex;
     this.rotSpeed = 0;
     this.player = player;
+  }
+
+  clone() {
+    const newBubble = new Bubble(
+      this.pos.clone(),
+      this.radius,
+      this.velocity.clone(),
+      this.spriteIndex,
+      this.player,
+    );
+    newBubble.rot = this.rot;
+    newBubble.rotSpeed = this.rotSpeed;
+    newBubble.bouncedOffWall = this.bouncedOffWall;
+    return newBubble;
   }
 
   mass() {
@@ -250,7 +272,7 @@ export class Bubble {
   }
   // BUG: collision with sides is offset by borderRadius (especially visible with a high borderRadius)
   // Handle collision with a Block
-  collideBlock(block: Block) {
+  collideBlock(block: Block): boolean {
     const borderRadius = block.borderRadius;
     let collisionDetected = false;
     let normal = new Vector(0, 0);
@@ -324,10 +346,13 @@ export class Bubble {
       this.velocity = this.velocity.mult(damping);
 
       this.bouncedOffWall = true;
+
+      return true; // Collision occurred
     }
+    return false; // No collision
   }
   // Handle collision with another Bubble
-  collideBubble(other: Bubble) {
+  collideBubble(other: Bubble): boolean {
     const vec = this.pos.sub(other.pos);
     const minDistance = this.radius + other.radius;
     const distance = vec.length();
@@ -360,7 +385,10 @@ export class Bubble {
         .dot(new Vector(-this.velocity.y, this.velocity.x).normalize());
       this.rotSpeed = rotDiff / 100;
       other.rotSpeed = rotDiff / 100;
+
+      return true; // Collision occurred
     }
+    return false; // No collision
   }
 
   update() {
@@ -372,14 +400,14 @@ export class Bubble {
     this.pos = this.pos.add(this.velocity);
   }
 
-  render(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
+  render(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, sprite: HTMLImageElement) {
     //TODO: color
     // drawCircle(ctx,this.pos, this.radius)
     // ctx.fillStyle = "rgb(200 0 0)";
     this.rot = this.rot || Math.PI * 2 * Math.random();
 
 
-    drawImage(ctx, this.sprite, this.pos, this.radius * 2, this.rot);
+    drawImage(ctx, sprite, this.pos, this.radius * 2, this.rot);
   }
 
   simpleRender(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, color = "rgb(200 0 0)") {
