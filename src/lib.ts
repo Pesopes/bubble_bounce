@@ -345,6 +345,12 @@ export class Bubble {
       // Optionally, apply a damping factor to simultate energy loss
       this.velocity = this.velocity.mult(damping);
 
+      //Eye candy - rotation
+      const rotDiff = normal
+        .normalize()
+        .dot(new Vector(-this.velocity.y, this.velocity.x).normalize());
+      this.rotSpeed = -rotDiff / 100;
+
       this.bouncedOffWall = true;
 
       return true; // Collision occurred
