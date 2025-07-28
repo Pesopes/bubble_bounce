@@ -22,8 +22,8 @@ Originally it was written in pure JS, now it is rewritten in TypeScript.
 - You can **scroll/pinch** to zoom in and out the board. This is useful for
   making fully charged shots in some situations.
 - To **cancel the current shot** let go inside the bubble you are aiming.
-- When the balls are taking too long to stop moving the **game speeds up**. This
-  does not alter the physics in any way so what happens would have happened
+- When the bubbles are taking too long to stop moving the **game speeds up**.
+  This does not alter the physics in any way so what happens would have happened
   either way.
 
 ## Inspiration
