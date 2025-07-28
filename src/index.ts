@@ -82,6 +82,7 @@ const backgroundImage = new Image();
 
 
 backgroundImage.src = backgroundImageSrc;
+// The bubble that is being dragged (to be shot)
 let clickedBub: Bubble | null = null;
 
 
@@ -580,11 +581,13 @@ function update(tFrame: number) {
 	updateAllBubbles();
 	// (almost) no movement => other player can play
 	if (allStopped() && isWaiting) {
+		// TODO: instead only speedup the game (maybe with an indicator so that it is obvious)
 		// Simulate 1000 frames so you don't have to wait for everything to completely stop
 		for (let i = 0; i < 1000; i++) {
 			updateAllBubbles();
 		}
 		isWaiting = false;
+		// FIXME: doesn't getWinner() already check for a draw?
 		// Win checking (no bubbles=>draw,else getWinner())
 		if (bubbles.length === 0) {
 			winGame(0);
