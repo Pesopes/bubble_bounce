@@ -7,6 +7,7 @@ const ballSpriteModules = import.meta.glob("./assets/balls/*.png", {
 	query: "?url",
 	import: "default",
 });
+// Loads all ball sprites from the assets/balls directory
 const ballSprites = Object.fromEntries(
 	Object.entries(ballSpriteModules).map(([path, url]) => {
 		const match = path.match(/(\d+)\.png$/);
@@ -44,9 +45,15 @@ let blocks: Block[] = [];
 let buttons: Button[] = [];
 let previewBubbles: Bubble[] = [];
 
+enum GameState {
+	MainMenu,
+	Game,
+	EndScreen
+}
+
 // game state
 let frame = 0;
-let gameState = 0;
+let gameState = GameState.MainMenu;
 let winningPlayer = 0;
 let currentPlayer = Math.round(Math.random()) + 1;
 let isWaiting = false;
@@ -124,7 +131,7 @@ function prepareStart() {
 			"START",
 			(_but) => {
 				resetGame();
-				gameState = 1;
+				gameState = GameState.Game;
 			},
 			"pink",
 		),
@@ -354,7 +361,7 @@ function prepareOffscreenCanvas() {
 	);
 	offCtx.restore();
 	// Line in middle
-	if (enableMiddleBlocks && gameState !== 2) {
+	if (enableMiddleBlocks && gameState !== GameState.EndScreen) {
 		offCtx.lineWidth = 3;
 		offCtx.strokeStyle = "rgba(0, 0, 0, 0.4)";
 		offCtx.beginPath();
@@ -439,13 +446,13 @@ function init() {
 		onPointerMove: (pos) => { mousePos = pos; },
 		onPointerDown: (pos) => {
 			mousePos = pos;
-			if (gameState === 0) {
+			if (gameState === GameState.MainMenu) {
 				for (const button of buttons) {
 					button.checkClick(pos);
 				}
 				return;
 			}
-			if (gameState === 2) {
+			if (gameState === GameState.EndScreen) {
 				resetGame();
 				return;
 			}
@@ -492,7 +499,7 @@ function init() {
 	new InputManager(canvas, gameCallbacks);
 }
 function resetGame() {
-	gameState = 0;
+	gameState = GameState.MainMenu;
 	bubbles = [];
 	blocks = [];
 	buttons = [];
@@ -508,7 +515,7 @@ function resizeCanvas() {
 	canvas.width = 950;
 }
 function winGame(player: 0 | 1 | 2) {
-	gameState = 2;
+	gameState = GameState.EndScreen;
 	blocks = [];
 	prepareOffscreenCanvas();
 	winningPlayer = player;
@@ -765,12 +772,12 @@ init();
 		if (!ctx) {
 			throw new Error("Main loop: 2D context not found");
 		}
-		if (gameState === 0) {
+		if (gameState === GameState.MainMenu) {
 			renderStart(ctx);
-		} else if (gameState === 1) {
+		} else if (gameState === GameState.Game) {
 			update(tFrame);
 			render(ctx);
-		} else if (gameState === 2) {
+		} else if (gameState === GameState.EndScreen) {
 			renderEnd(ctx);
 		}
 	}
