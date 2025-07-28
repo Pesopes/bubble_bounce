@@ -846,6 +846,13 @@ function renderEnd(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingConte
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	ctx.drawImage(offscreenCanvas, 0, 0);
 
+	// Not the best to make a new bubble every frame but it is only for the end screen so it shouldn't matter
+	if (winningPlayer !== 0) {
+		console.log("winningPlayer", winningPlayer);
+		const winningPlayerBubble = new Bubble(new Vector(canvas.width / 2, canvas.height / 4), bigBallSize * 2, new Vector(), chosenSprites[winningPlayer === 1 ? 1 : 0], winningPlayer);
+		winningPlayerBubble.rot = 0; // Otherwise it will be random every frame
+		winningPlayerBubble.render(ctx, getBallSprite(winningPlayerBubble.spriteIndex));
+	}
 	let message = "";
 	if (winningPlayer === 0) {
 		message = "Draw";
