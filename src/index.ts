@@ -84,6 +84,8 @@ const mediumBallSize = 50;
 const smallBallSize = 37;
 const distanceFromSide = 300; //determines how far it will spawn the balls based on the top/bottom border
 const maxVelocityLen = 500;
+const slowSpeedThreshold = 0.6; // threshold for slow speed, game speeds up when all bubbles are below this speed
+const stopSpeedThreshold = 0.03; // threshold for stopping the turn, when all bubbles are below this speed
 // Visual settings
 let chosenSprites: number[] = [];
 let renderLinesBetween = true;
@@ -634,12 +636,17 @@ function switchPlayer() {
 		currentPlayer = 1;
 	}
 }
-const allStopped = () => {
+
+
+const fastestBubbleVelocity = () => {
+	let maxVel = 0;
 	for (const bubble of bubbles) {
-		if (bubble.velocity.length() > 0.3) return false;
+		if (bubble.velocity.length() > maxVel) {
+			maxVel = bubble.velocity.length();
+		}
 	}
-	return true;
-};
+	return maxVel;
+}
 
 // TODO: make with an enum
 // Checks for remaining bubbles and returns the winner (0 for draw, 1 for player 1, 2 for player 2)
@@ -691,8 +698,16 @@ function update(tFrame: number) {
 	// Delete bubbles out of bounds
 	bubbles = bubbles.filter((b) => !b.outOfBounds(canvas.width, canvas.height));
 	updateAllBubbles();
-	// (almost) no movement => change turns
-	if (allStopped() && isWaiting) {
+
+	// Very slow movement
+	if (fastestBubbleVelocity() < slowSpeedThreshold && isWaiting) {
+		for (let i = 0; i < 2; i++) {
+			updateAllBubbles();
+		}
+	}
+	if (fastestBubbleVelocity() < stopSpeedThreshold && isWaiting) {
+		// (basically) no movement => change turns
+
 		// TODO: instead only speedup the game (maybe with an indicator so that it is obvious)
 		// Simulate 1000 frames so you don't have to wait for everything to completely stop
 		for (let i = 0; i < 1000; i++) {
@@ -795,6 +810,35 @@ function render(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2
 		ctx.lineTo(end.x, end.y);
 		ctx.stroke();
 		ctx.setLineDash([]);
+	}
+
+	// Draw a fast forward indicator at the top of the screen (when fast forwarding)
+	if (fastestBubbleVelocity() < slowSpeedThreshold && isWaiting) {
+		ctx.save();
+		ctx.fillStyle = "rgba(43, 38, 38, 0.9)";
+
+		const spacing = 20;
+		const centerX = canvas.width / 2 + spacing / 2;
+		const centerY = 120;
+		const triangleSize = 80;
+
+		// First triangle (left)
+		ctx.beginPath();
+		ctx.moveTo(centerX - spacing - triangleSize, centerY - triangleSize / 2);
+		ctx.lineTo(centerX - spacing, centerY);
+		ctx.lineTo(centerX - spacing - triangleSize, centerY + triangleSize / 2);
+		ctx.closePath();
+		ctx.fill();
+
+		// Second triangle (right)
+		ctx.beginPath();
+		ctx.moveTo(centerX + spacing, centerY - triangleSize / 2);
+		ctx.lineTo(centerX + spacing + triangleSize, centerY);
+		ctx.lineTo(centerX + spacing, centerY + triangleSize / 2);
+		ctx.closePath();
+		ctx.fill();
+
+		ctx.restore();
 	}
 }
 // End screen - shows who won
