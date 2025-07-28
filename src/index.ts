@@ -19,6 +19,18 @@ const ballSprites = Object.fromEntries(
 	}),
 );
 
+
+type SaveState = {
+	bubbles: Bubble[];
+	blocks: Block[];
+	currentPlayer: number;
+	firstBounce: boolean;
+	// chosenSprites: number[];
+	// smallBallCount: number;
+	// enableMiddleBlocks: boolean;
+	// requiredBounce: boolean;
+}
+
 const canvas = document.getElementById("main-canvas") as HTMLCanvasElement;
 if (!canvas) {
 	throw new Error("Canvas not found");
@@ -57,6 +69,8 @@ let gameState = GameState.MainMenu;
 let winningPlayer = 0;
 let currentPlayer = Math.round(Math.random()) + 1;
 let isWaiting = false;
+let saveStateBeforeShot: SaveState | null = null;
+let firstBounce = true;
 
 // Gameplay settings
 let enableMiddleBlocks = true;
@@ -225,7 +239,7 @@ function prepareStart() {
 				previewPosCenter.add(new Vector(sign * previewBubbleOffset, 0)),
 				bigBallSize,
 				new Vector(),
-				getBallSprite(chosenSprites[i]),
+				chosenSprites[i],
 				i + 1,
 			),
 		);
@@ -243,7 +257,7 @@ function prepareStart() {
 					chosenSprites[i] = (chosenSprites[i] - 1) % Object.keys(ballSprites).length;
 					if (chosenSprites[i] < 0)
 						chosenSprites[i] = Object.keys(ballSprites).length - 1;
-					previewBubbles[i].sprite = getBallSprite(chosenSprites[i]);
+					previewBubbles[i].spriteIndex = chosenSprites[i];
 				},
 
 				previewButtonColor,
@@ -262,7 +276,7 @@ function prepareStart() {
 				">",
 				(_but) => {
 					chosenSprites[i] = (chosenSprites[i] + 1) % Object.keys(ballSprites).length;
-					previewBubbles[i].sprite = getBallSprite(chosenSprites[i]);
+					previewBubbles[i].spriteIndex = chosenSprites[i];
 				},
 
 				previewButtonColor,
@@ -376,14 +390,14 @@ function prepareOffscreenCanvas() {
 	}
 }
 // Spawn the playing balls, some in preset positions and sizes, others randomly
-function spawnPlayerBalls(center: Vector, playerSprite: HTMLImageElement, playerNum: number, top: boolean) {
+function spawnPlayerBalls(center: Vector, playerSpriteIndex: number, playerNum: number, top: boolean) {
 	// Converts bool to int (-1 or 1)
 	const side = +top * 2 - 1;
 	const newBub = new Bubble(
 		center,
 		bigBallSize,
 		new Vector(),
-		playerSprite,
+		playerSpriteIndex,
 		playerNum,
 	);
 	bubbles.push(newBub);
@@ -397,7 +411,7 @@ function spawnPlayerBalls(center: Vector, playerSprite: HTMLImageElement, player
 				),
 				mediumBallSize,
 				new Vector(),
-				playerSprite,
+				playerSpriteIndex,
 				playerNum,
 			),
 		);
@@ -414,7 +428,7 @@ function spawnPlayerBalls(center: Vector, playerSprite: HTMLImageElement, player
 			),
 			smallBallSize,
 			new Vector(),
-			playerSprite,
+			playerSpriteIndex,
 			playerNum,
 		);
 		if (!isColliding(newSmallBub)) {
@@ -440,8 +454,8 @@ function init() {
 		canvas.width / 2,
 		canvas.height - distanceFromSide,
 	);
-	spawnPlayerBalls(topPlayerCenter, getBallSprite(chosenSprites[0]), 1, true);
-	spawnPlayerBalls(bottomPlayerCenter, getBallSprite(chosenSprites[1]), 2, false);
+	spawnPlayerBalls(topPlayerCenter, chosenSprites[0], 1, true);
+	spawnPlayerBalls(bottomPlayerCenter, chosenSprites[1], 2, false);
 
 	const gameCallbacks: GameInputCallbacks = {
 		onPointerMove: (pos) => { mousePos = pos; },
@@ -458,7 +472,7 @@ function init() {
 				return;
 			}
 			// start aiming (saves the clicked bubble)
-			if (!isWaiting) {
+			if (gameState === GameState.Game && !isWaiting) {
 				clickedBub = get_bubble_in_pos(mousePos);
 				if (clickedBub && clickedBub.player !== currentPlayer) {
 					clickedBub = null;
@@ -475,6 +489,9 @@ function init() {
 					clickedBub = null;
 					return;
 				}
+				// Make a save state before shooting
+				saveStateBeforeShot = getSaveState();
+				// Shoot the bubble
 				clickedBub.velocity = dirVec
 					.normalize()
 					.mult(
@@ -516,6 +533,35 @@ function resetGame() {
 	init();
 	prepareOffscreenCanvas();
 }
+
+
+
+function getSaveState(): SaveState {
+	return {
+		bubbles: bubbles.map((b) => b.clone()),
+		blocks: blocks.map((b) => b.clone()),
+		currentPlayer,
+		firstBounce,
+		// chosenSprites: [...chosenSprites],
+		// smallBallCount,
+		// enableMiddleBlocks,
+		// requiredBounce,
+	};
+}
+function loadSaveState(saveState: SaveState) {
+	// Maybe I should clone here as well?
+	bubbles = saveState.bubbles;
+	blocks = saveState.blocks;
+	currentPlayer = saveState.currentPlayer;
+	firstBounce = saveState.firstBounce;
+	// chosenSprites = [...saveState.chosenSprites];
+	// smallBallCount = saveState.smallBallCount;
+	// enableMiddleBlocks = saveState.enableMiddleBlocks;
+	// requiredBounce = saveState.requiredBounce;
+
+	// prepareOffscreenCanvas();
+}
+
 // Called when resizing but currently static
 function resizeCanvas() {
 	canvas.height = 1600;
@@ -566,10 +612,22 @@ function updateAllBubbles() {
 	bubbles.forEach((b1, i) => {
 		b1.update();
 		for (const b2 of bubbles.slice(i + 1)) {
-			b1.collideBubble(b2);
+			const result = b1.collideBubble(b2);
+			if (result) {
+				if (firstBounce && requiredBounce) {
+					// If different players' balls collide
+					if ((b1.player === currentPlayer) !== (b2.player === currentPlayer)) {
+						loadSaveState(saveStateBeforeShot ?? getSaveState())
+					}
+				}
+				firstBounce = false;
+			}
 		}
 		for (const block of blocks) {
-			b1.collideBlock(block);
+			const result = b1.collideBlock(block);
+			if (result) {
+				firstBounce = false;
+			}
 		}
 	});
 }
@@ -579,14 +637,17 @@ function update(tFrame: number) {
 	// Delete bubbles out of bounds
 	bubbles = bubbles.filter((b) => !b.outOfBounds(canvas.width, canvas.height));
 	updateAllBubbles();
-	// (almost) no movement => other player can play
+	// (almost) no movement => change turns
 	if (allStopped() && isWaiting) {
 		// TODO: instead only speedup the game (maybe with an indicator so that it is obvious)
 		// Simulate 1000 frames so you don't have to wait for everything to completely stop
 		for (let i = 0; i < 1000; i++) {
 			updateAllBubbles();
 		}
+		firstBounce = true;
 		isWaiting = false;
+		// Make a save state after settling
+		saveStateBeforeShot = getSaveState();
 		// FIXME: doesn't getWinner() already check for a draw?
 		// Win checking (no bubbles=>draw,else getWinner())
 		if (bubbles.length === 0) {
@@ -638,7 +699,7 @@ function render(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2
 				bubble.radius + bubble.radius * 0.15 * (Math.sin(frame / 250) + 1),
 			);
 		}
-		bubble.render(ctx);
+		bubble.render(ctx, getBallSprite(bubble.spriteIndex));
 	}
 
 	// Dragging line and hit indicator
@@ -713,7 +774,7 @@ function renderStart(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingCon
 		button.render(ctx);
 	}
 	for (const previewBubble of previewBubbles) {
-		previewBubble.render(ctx);
+		previewBubble.render(ctx, getBallSprite(previewBubble.spriteIndex));
 	}
 
 	ctx.fillStyle = "black";
@@ -726,7 +787,7 @@ function renderStart(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingCon
 /// Uses a 'Bubble' for checking for collisions with other bubbles and blocks along the raycast
 function raycastSphere(from: Vector, to: Vector, radius: number, exclude: Bubble, steps = 100) {
 	const dir = to.sub(from);
-	const testBub = new Bubble(new Vector(), radius, new Vector(), getBallSprite(1));
+	const testBub = new Bubble(new Vector(), radius, new Vector(), 1);
 	for (let i = 1; i <= steps; i++) {
 		const progress = i / steps;
 		const testPos = from.add(dir.mult(progress));
