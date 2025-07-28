@@ -127,6 +127,14 @@ function getRandomBallSpriteIdx() {
 	return Math.floor(Math.random() * Object.keys(ballSprites).length);
 }
 
+function randomizeChosenSprites() {
+	// Get random starting sprites that are different to each other
+	chosenSprites[0] = getRandomBallSpriteIdx();
+	do {
+		chosenSprites[1] = getRandomBallSpriteIdx();
+	} while (chosenSprites[0] === chosenSprites[1]);
+
+}
 
 // Create the main menu elements
 function prepareStart() {
@@ -206,7 +214,7 @@ function prepareStart() {
 				canvas.height - buttonDim.y * 3 - 400 - spacing * 2,
 			),
 			buttonDim,
-			`Small balls: ${smallBallCount}`,
+			`Small bubbles: ${smallBallCount}`,
 			(but) => {
 				const currentIndex = presetBallCounts.indexOf(smallBallCount);
 				smallBallCount =
@@ -214,7 +222,7 @@ function prepareStart() {
 				const ballCountRatio =
 					smallBallCount / presetBallCounts[presetBallCounts.length - 1];
 				but.color = `rgb(${-ballCountRatio * 100 + 200}, ${233}, ${203})`;
-				but.text = `Small balls: ${smallBallCount}`;
+				but.text = `Small bubbles: ${smallBallCount}`;
 				saveSettings();
 
 			},
@@ -225,17 +233,38 @@ function prepareStart() {
 	//
 	// PREVIEW BALLS AND BUTTONS
 	// There are two balls each with two buttons to cycle all availableSprites and choose
-	const previewPosCenter = new Vector(canvas.width / 2, 350);
+
+	const previewPosCenter = new Vector(canvas.width / 2, 300);
+
+	// Randomize sprites button
+	const randomizeButtonDim = new Vector(200, 110);
+	buttons.push(
+		new Button(
+			new Vector(
+				(canvas.width - randomizeButtonDim.x) / 2,
+				previewPosCenter.y + bigBallSize / 2 + randomizeButtonDim.y - spacing - 20,
+			),
+			randomizeButtonDim,
+			`Randomize`,
+			(_but) => {
+				randomizeChosenSprites();
+				for (let i = 0; i < previewBubbles.length; i++) {
+					previewBubbles[i].spriteIndex = chosenSprites[i];
+				}
+				saveSettings();
+			},
+
+			ballCountColor,
+		),
+	);
+
 
 	const previewButtonSwitchDim = new Vector(80, bigBallSize * 2);
 	const previewButtonColor = "#dbedd0";
 	const previewBubbleOffset = 200;
-	// Get random starting sprites that are different to each other
+
 	if (chosenSprites.length === 0) {
-		chosenSprites[0] = getRandomBallSpriteIdx();
-		do {
-			chosenSprites[1] = getRandomBallSpriteIdx();
-		} while (chosenSprites[0] === chosenSprites[1]);
+		randomizeChosenSprites();
 	}
 
 	// Do for both players
@@ -795,7 +824,7 @@ function renderStart(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingCon
 	ctx.fillStyle = "black";
 	ctx.textAlign = "center";
 	ctx.font = 'bold 100px "Helvetica", sans-serif';
-	ctx.fillText("Bubble Bounce", canvas.width / 2, canvas.height / 8);
+	ctx.fillText("Bubble Bounce", canvas.width / 2, canvas.height / 10);
 }
 
 // TODO: make exclude an array and optional
