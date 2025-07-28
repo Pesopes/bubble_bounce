@@ -563,8 +563,15 @@ function init() {
 		onResize: () => { resizeCanvas() }
 	}
 
-	new InputManager(canvas, gameCallbacks);
-
+	const inputManager = new InputManager(canvas, gameCallbacks);
+	inputManager.onKey("Escape", () => {
+		if (gameState === GameState.Game) {
+			gameState = GameState.MainMenu;
+			resetGame();
+		} else if (gameState === GameState.EndScreen) {
+			resetGame();
+		}
+	});
 }
 function resetGame() {
 	gameState = GameState.MainMenu;
