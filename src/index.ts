@@ -2,6 +2,8 @@ import { Vector, Bubble, Block, Button, drawCircle } from "./lib";
 import backgroundImageSrc from "./assets/abstract_dots.svg";
 import { GameInputCallbacks, InputManager } from "./input";
 import { LocalStorageManager } from "./localStorage";
+import { Howl } from "howler";
+
 
 const ballSpriteModules = import.meta.glob("./assets/balls/*.png", {
 	eager: true,
@@ -20,6 +22,32 @@ const ballSprites = Object.fromEntries(
 	}),
 );
 
+
+// Audio sfx
+const loseOpponentBallSound = new Howl({ src: ["./sfx/lose_opponent_ball.ogg"], volume: 0.8 });
+const loseBallSound = new Howl({ src: ["./sfx/lose_ball.ogg"], volume: 0.8 });
+const collisionSoundsBalls = [new Howl({
+	src: ["./sfx/collide_1.ogg"],
+	pool: 7,
+}), new Howl({
+	src: ["./sfx/collide_2.ogg"],
+	pool: 7,
+}), new Howl({
+	src: ["./sfx/collide_3.ogg"],
+	pool: 7,
+}), new Howl({
+	src: ["./sfx/collide_4.ogg"],
+	pool: 7,
+})];
+const collisionSoundWall = new Howl({
+	src: ["./sfx/wall_collide.ogg"],
+	volume: 0.8
+});
+const fastForwardSound = new Howl({
+	src: ["./sfx/fast-forward.ogg"],
+	preload: true,
+	loop: true,
+})
 
 type SaveState = {
 	bubbles: Bubble[];
@@ -458,6 +486,7 @@ function spawnPlayerBalls(center: Vector, playerSpriteIndex: number, playerNum: 
 			),
 		);
 	}
+	// FIXME: sometimes one player has more small bubbles than the other (maybe not now that im testing it idk)
 	// Random small ones
 	const iterMax = 150;
 	let iterCount = 0;
@@ -584,6 +613,9 @@ function resetGame() {
 	blocks = [];
 	buttons = [];
 	previewBubbles = [];
+	isWaiting = false;
+
+	fastForwardSound.stop();
 
 	currentPlayer = Math.round(Math.random()) + 1;
 	init();
@@ -674,7 +706,17 @@ function updateAllBubbles() {
 		b1.update();
 		for (const b2 of bubbles.slice(i + 1)) {
 			const result = b1.collideBubble(b2);
-			if (result) {
+			if (result && isWaiting) {
+				if (b1.velocity.length() > 0.2 || b2.velocity.length() > 0.2) {
+					const velocity = Math.max(b1.velocity.length(), b2.velocity.length());
+					const maxVelocity = 10;
+					const minVolume = 0.2;
+					const maxVolume = 2.0;
+					const volume = Math.min(minVolume + (velocity / maxVelocity) * (maxVolume - minVolume), maxVolume);
+					const soundIdx = Math.floor(Math.random() * collisionSoundsBalls.length);
+					collisionSoundsBalls[soundIdx].volume(volume);
+					collisionSoundsBalls[soundIdx].play();
+				}
 				if (firstBounce && requiredBounce) {
 					// If different players' balls collide
 					if ((b1.player === currentPlayer) !== (b2.player === currentPlayer)) {
@@ -685,8 +727,18 @@ function updateAllBubbles() {
 			}
 		}
 		for (const block of blocks) {
+
 			const result = b1.collideBlock(block);
-			if (result) {
+
+			if (result && isWaiting) {
+				const velocity = b1.velocity.length();
+				const maxVelocity = 10;
+				const minVolume = 0.1;
+				const maxVolume = 1.5;
+				const volume = Math.min(minVolume + (velocity / maxVelocity) * (maxVolume - minVolume), maxVolume);
+
+				collisionSoundWall.volume(volume);
+				collisionSoundWall.play();
 				firstBounce = false;
 			}
 		}
@@ -696,19 +748,23 @@ function updateAllBubbles() {
 function update(tFrame: number) {
 	frame = tFrame;
 	// Delete bubbles out of bounds
+	for (const bubble of bubbles) {
+		if (bubble.outOfBounds(canvas.width, canvas.height) && isWaiting) {
+			// These are technically switched because at this point the currentPlayer has already switched
+			if (currentPlayer === bubble.player) {
+				loseOpponentBallSound.play();
+			} else {
+				loseBallSound.play();
+			}
+		}
+	}
 	bubbles = bubbles.filter((b) => !b.outOfBounds(canvas.width, canvas.height));
 	updateAllBubbles();
 
-	// Very slow movement
-	if (fastestBubbleVelocity() < slowSpeedThreshold && isWaiting) {
-		for (let i = 0; i < 2; i++) {
-			updateAllBubbles();
-		}
-	}
 	if (fastestBubbleVelocity() < stopSpeedThreshold && isWaiting) {
 		// (basically) no movement => change turns
+		fastForwardSound.stop();
 
-		// TODO: instead only speedup the game (maybe with an indicator so that it is obvious)
 		// Simulate 1000 frames so you don't have to wait for everything to completely stop
 		for (let i = 0; i < 1000; i++) {
 			updateAllBubbles();
@@ -726,6 +782,15 @@ function update(tFrame: number) {
 			if (winner !== 0) {
 				winGame(winner);
 			}
+		}
+	} else if (fastestBubbleVelocity() < slowSpeedThreshold && isWaiting) {
+		// Very slow movement
+		if (!fastForwardSound.playing()) {
+			fastForwardSound.fade(0.3, 0.7, 1000);
+			fastForwardSound.play();
+		}
+		for (let i = 0; i < 2; i++) {
+			updateAllBubbles();
 		}
 	}
 }
@@ -849,7 +914,6 @@ function renderEnd(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingConte
 
 	// Not the best to make a new bubble every frame but it is only for the end screen so it shouldn't matter
 	if (winningPlayer !== 0) {
-		console.log("winningPlayer", winningPlayer);
 		const winningPlayerBubble = new Bubble(new Vector(canvas.width / 2, canvas.height / 4), bigBallSize * 2, new Vector(), chosenSprites[winningPlayer === 1 ? 1 : 0], winningPlayer);
 		winningPlayerBubble.rot = 0; // Otherwise it will be random every frame
 		winningPlayerBubble.render(ctx, getBallSprite(winningPlayerBubble.spriteIndex));
