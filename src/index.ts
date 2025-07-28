@@ -89,7 +89,7 @@ let chosenSprites: number[] = [];
 let renderLinesBetween = true;
 let chargeDir = -1;
 
-
+let inputManager: InputManager;
 
 const fireForce = 18;
 
@@ -498,9 +498,13 @@ function init() {
 	);
 	spawnPlayerBalls(topPlayerCenter, chosenSprites[0], 1, true);
 	spawnPlayerBalls(bottomPlayerCenter, chosenSprites[1], 2, false);
+}
 
+function setupInput() {
 	const gameCallbacks: GameInputCallbacks = {
-		onPointerMove: (pos) => { mousePos = pos; },
+		onPointerMove: (pos) => {
+			mousePos = pos;
+		},
 		onPointerDown: (pos) => {
 			mousePos = pos;
 			if (gameState === GameState.MainMenu) {
@@ -560,15 +564,14 @@ function init() {
 				zoomOut();
 			}
 		},
-		onResize: () => { resizeCanvas() }
-	}
+		onResize: () => {
+			resizeCanvas();
+		},
+	};
 
-	const inputManager = new InputManager(canvas, gameCallbacks);
+	inputManager = new InputManager(canvas, gameCallbacks);
 	inputManager.onKey("Escape", () => {
-		if (gameState === GameState.Game) {
-			gameState = GameState.MainMenu;
-			resetGame();
-		} else if (gameState === GameState.EndScreen) {
+		if (gameState === GameState.Game || gameState === GameState.EndScreen) {
 			resetGame();
 		}
 	});
@@ -902,6 +905,7 @@ function loadSettings(settings: Settings) {
 
 function saveSettings() {
 	LocalStorageManager.set("bubble_bounce_settings", {
+		chosenSprites,
 		smallBallCount,
 		enableMiddleBlocks,
 		requiredBounce,
@@ -917,6 +921,7 @@ const zoomOut = () => {
 
 
 init();
+setupInput();
 // The main game loop
 (() => {
 	function main(tFrame: number) {
