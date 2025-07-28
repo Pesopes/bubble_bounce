@@ -776,6 +776,7 @@ function render(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2
 		const bubPos = clickedBub.pos;
 		// const end = bubPos.add(bubPos.sub(mousePos))
 		const maxRaycast = new Vector(canvas.width, canvas.height).length();
+		const chargeDistance = bubPos.sub(mousePos).length();
 		const raycastEnd = bubPos.add(
 			bubPos.sub(mousePos).mult(chargeDir).normalize().mult(maxRaycast),
 		);
@@ -787,7 +788,7 @@ function render(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2
 			200,
 		);
 		// Draws a transparent bubble where the raycast hit
-		if (raycastHit) {
+		if (raycastHit && chargeDistance > clickedBub.radius) {
 			ctx.fillStyle =
 				clickedBub.player === 2
 					? "rgba(158, 152, 250, 0.3)"
