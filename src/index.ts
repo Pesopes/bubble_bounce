@@ -1,6 +1,7 @@
 import { Vector, Bubble, Block, Button, drawCircle } from "./lib";
 import backgroundImageSrc from "./assets/abstract_dots.svg";
 import { GameInputCallbacks, InputManager } from "./input";
+import { LocalStorageManager } from "./localStorage";
 
 const ballSpriteModules = import.meta.glob("./assets/balls/*.png", {
 	eager: true,
@@ -164,6 +165,8 @@ function prepareStart() {
 				enableMiddleBlocks = !enableMiddleBlocks;
 				but.text = enableMiddleBlocks ? "Blocks: Enabled" : "Blocks: Disabled";
 				but.color = enableMiddleBlocks ? onColor : offColor;
+
+				saveSettings();
 			},
 
 			enableMiddleBlocks ? onColor : offColor,
@@ -184,6 +187,8 @@ function prepareStart() {
 					? "Require bounce: Enabled"
 					: "Require bounce: Disabled";
 				but.color = requiredBounce ? onColor : offColor;
+				saveSettings();
+
 			},
 
 			requiredBounce ? onColor : offColor,
@@ -210,6 +215,8 @@ function prepareStart() {
 					smallBallCount / presetBallCounts[presetBallCounts.length - 1];
 				but.color = `rgb(${-ballCountRatio * 100 + 200}, ${233}, ${203})`;
 				but.text = `Small balls: ${smallBallCount}`;
+				saveSettings();
+
 			},
 
 			ballCountColor,
@@ -258,6 +265,8 @@ function prepareStart() {
 					if (chosenSprites[i] < 0)
 						chosenSprites[i] = Object.keys(ballSprites).length - 1;
 					previewBubbles[i].spriteIndex = chosenSprites[i];
+					saveSettings();
+
 				},
 
 				previewButtonColor,
@@ -277,6 +286,8 @@ function prepareStart() {
 				(_but) => {
 					chosenSprites[i] = (chosenSprites[i] + 1) % Object.keys(ballSprites).length;
 					previewBubbles[i].spriteIndex = chosenSprites[i];
+					saveSettings();
+
 				},
 
 				previewButtonColor,
@@ -446,6 +457,8 @@ function init() {
 	// DO THIS FIRST ALWAYS (the game is made for a constant width and height)
 	resizeCanvas();
 
+	loadSettings(getSettings());
+
 	prepareBoard();
 
 	prepareStart();
@@ -490,6 +503,7 @@ function init() {
 					return;
 				}
 				// Make a save state before shooting
+				firstBounce = true;
 				saveStateBeforeShot = getSaveState();
 				// Shoot the bubble
 				clickedBub.velocity = dirVec
@@ -521,6 +535,7 @@ function init() {
 	}
 
 	new InputManager(canvas, gameCallbacks);
+
 }
 function resetGame() {
 	gameState = GameState.MainMenu;
@@ -822,9 +837,40 @@ function get_bubble_in_pos(pos: Vector) {
 
 
 
+type Settings = {
+	smallBallCount: number;
+	enableMiddleBlocks: boolean;
+	requiredBounce: boolean;
+}
 
+function getSettings(): Settings {
+	const defaultSettings = {
+		smallBallCount: presetBallCounts[2],
+		enableMiddleBlocks: true,
+		requiredBounce: false,
+	};
+	const savedSettings = LocalStorageManager.get<Settings>("bubble_bounce_settings");
+	if (savedSettings) {
+		return savedSettings;
+	}
+	return defaultSettings;
+}
 
+function loadSettings(settings: Settings) {
+	smallBallCount = settings.smallBallCount;
+	enableMiddleBlocks = settings.enableMiddleBlocks;
+	requiredBounce = settings.requiredBounce;
 
+	saveSettings();
+}
+
+function saveSettings() {
+	LocalStorageManager.set("bubble_bounce_settings", {
+		smallBallCount,
+		enableMiddleBlocks,
+		requiredBounce,
+	});
+}
 
 const zoomIn = () => {
 	canvas.style.transform = "scale(1)";
