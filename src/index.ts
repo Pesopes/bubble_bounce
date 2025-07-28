@@ -468,6 +468,12 @@ function init() {
 			// Stopped aiming -> shoot
 			if (clickedBub) {
 				const dirVec = clickedBub.pos.sub(mousePos).mult(chargeDir);
+
+				// Aimed very near the clicked bubble so cancel the shot
+				if (dirVec.length() - clickedBub.radius <= 20) {
+					clickedBub = null;
+					return;
+				}
 				clickedBub.velocity = dirVec
 					.normalize()
 					.mult(

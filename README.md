@@ -15,3 +15,4 @@ increasing demands from google on the play store.
 - You can scroll/pinch to zoom in and out the board. This is useful for making
   fully charged shots in some situations.
 - The require bounce option is not actually implemented and does nothing.
+- To cancel the current shot let go inside the bubble you are aiming.
