@@ -535,7 +535,7 @@ function switchPlayer() {
 }
 const allStopped = () => {
 	for (const bubble of bubbles) {
-		if (bubble.velocity.length() > 0.24) return false;
+		if (bubble.velocity.length() > 0.3) return false;
 	}
 	return true;
 };
