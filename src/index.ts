@@ -5,7 +5,7 @@ import { LocalStorageManager } from "./localStorage";
 import { Howl } from "howler";
 
 
-const ballSpriteModules = import.meta.glob("./assets/balls/*.png", {
+const ballSpriteModules = import.meta.glob("./assets/balls/*.webp", {
 	eager: true,
 	query: "?url",
 	import: "default",
@@ -13,7 +13,7 @@ const ballSpriteModules = import.meta.glob("./assets/balls/*.png", {
 // Loads all ball sprites from the assets/balls directory
 const ballSprites = Object.fromEntries(
 	Object.entries(ballSpriteModules).map(([path, url]) => {
-		const match = path.match(/(\d+)\.png$/);
+		const match = path.match(/(\d+)\.webp$/);
 		const ballNumber = match ? match[1] : "1";
 		const img = new Image();
 		img.src = url as string;
