@@ -4,6 +4,10 @@ A simple 2-player game designed primarily for mobile use.
 
 Originally it was written in pure JS, now it is rewritten in TypeScript.
 
+> [!NOTE]
+> The game is really choppy on firefox for android. If on android use a
+> chromium-based browser instead.
+
 ## Game options
 
 - You can configure the looks of your bubbles or randomize them, this doesn't
