@@ -102,6 +102,7 @@ let saveStateBeforeShot: SaveState | null = null;
 let firstBounce = true;
 
 // Gameplay settings
+let sfxEnabled = true;
 let enableMiddleBlocks = true;
 let requiredBounce = false;
 const presetBallCounts = [0, 3, 5, 8, 10, 15];
@@ -232,6 +233,7 @@ function prepareStart() {
 			requiredBounce ? onColor : offColor,
 		),
 	);
+
 	// CHANGE BALL COUNT BUTTONS
 	const startingBallCountRatio =
 		smallBallCount / presetBallCounts[presetBallCounts.length - 1];
@@ -261,7 +263,7 @@ function prepareStart() {
 		),
 	);
 	//
-	// PREVIEW BALLS AND BUTTONS
+	// PREVIEW BALLS AND BUTTONS (AND ALSO SFX TOGGLE)
 	// There are two balls each with two buttons to cycle all availableSprites and choose
 
 	const previewPosCenter = new Vector(canvas.width / 2, 300);
@@ -287,7 +289,26 @@ function prepareStart() {
 			ballCountColor,
 		),
 	);
+	// SFX TOGGLE
+	const sfxButtonDim = new Vector(130, 110);
+	buttons.push(
+		new Button(
+			new Vector(
+				(canvas.width - sfxButtonDim.x) / 2 + randomizeButtonDim.x + 35,
+				previewPosCenter.y + bigBallSize / 2 + randomizeButtonDim.y - spacing - 20,
+			),
+			sfxButtonDim,
+			sfxEnabled ? "🔊" : "🔈",
+			(but) => {
+				sfxEnabled = !sfxEnabled;
+				but.text = sfxEnabled ? "🔊" : "🔈";
+				but.color = sfxEnabled ? onColor : offColor;
+				saveSettings();
+			},
 
+			sfxEnabled ? onColor : offColor,
+		),
+	);
 
 	const previewButtonSwitchDim = new Vector(80, bigBallSize * 2);
 	const previewButtonColor = "#dbedd0";
@@ -615,7 +636,7 @@ function resetGame() {
 	previewBubbles = [];
 	isWaiting = false;
 
-	fastForwardSound.stop();
+	if (sfxEnabled) fastForwardSound.stop();
 
 	currentPlayer = Math.round(Math.random()) + 1;
 	init();
@@ -715,7 +736,7 @@ function updateAllBubbles() {
 					const volume = Math.min(minVolume + (velocity / maxVelocity) * (maxVolume - minVolume), maxVolume);
 					const soundIdx = Math.floor(Math.random() * collisionSoundsBalls.length);
 					collisionSoundsBalls[soundIdx].volume(volume);
-					collisionSoundsBalls[soundIdx].play();
+					if (sfxEnabled) collisionSoundsBalls[soundIdx].play();
 				}
 				if (firstBounce && requiredBounce) {
 					// If different players' balls collide
@@ -738,7 +759,7 @@ function updateAllBubbles() {
 				const volume = Math.min(minVolume + (velocity / maxVelocity) * (maxVolume - minVolume), maxVolume);
 
 				collisionSoundWall.volume(volume);
-				collisionSoundWall.play();
+				if (sfxEnabled) collisionSoundWall.play();
 				firstBounce = false;
 			}
 		}
@@ -752,9 +773,9 @@ function update(tFrame: number) {
 		if (bubble.outOfBounds(canvas.width, canvas.height) && isWaiting) {
 			// These are technically switched because at this point the currentPlayer has already switched
 			if (currentPlayer === bubble.player) {
-				loseOpponentBallSound.play();
+				if (sfxEnabled) loseOpponentBallSound.play();
 			} else {
-				loseBallSound.play();
+				if (sfxEnabled) loseBallSound.play();
 			}
 		}
 	}
@@ -763,7 +784,7 @@ function update(tFrame: number) {
 
 	if (fastestBubbleVelocity() < stopSpeedThreshold && isWaiting) {
 		// (basically) no movement => change turns
-		fastForwardSound.stop();
+		if (sfxEnabled) fastForwardSound.stop();
 
 		// Simulate 1000 frames so you don't have to wait for everything to completely stop
 		for (let i = 0; i < 1000; i++) {
@@ -785,7 +806,7 @@ function update(tFrame: number) {
 		}
 	} else if (fastestBubbleVelocity() < slowSpeedThreshold && isWaiting) {
 		// Very slow movement
-		if (!fastForwardSound.playing()) {
+		if (sfxEnabled && !fastForwardSound.playing()) {
 			fastForwardSound.fade(0.3, 0.7, 1000);
 			fastForwardSound.play();
 		}
@@ -1005,6 +1026,7 @@ type Settings = {
 	smallBallCount: number;
 	enableMiddleBlocks: boolean;
 	requiredBounce: boolean;
+	sfxEnabled: boolean;
 }
 
 function getSettings(): Settings {
@@ -1012,6 +1034,7 @@ function getSettings(): Settings {
 		smallBallCount: presetBallCounts[2],
 		enableMiddleBlocks: true,
 		requiredBounce: false,
+		sfxEnabled: true,
 	};
 	const savedSettings = LocalStorageManager.get<Settings>("bubble_bounce_settings");
 	if (savedSettings) {
@@ -1024,16 +1047,17 @@ function loadSettings(settings: Settings) {
 	smallBallCount = settings.smallBallCount;
 	enableMiddleBlocks = settings.enableMiddleBlocks;
 	requiredBounce = settings.requiredBounce;
+	sfxEnabled = settings.sfxEnabled;
 
 	saveSettings();
 }
 
 function saveSettings() {
 	LocalStorageManager.set("bubble_bounce_settings", {
-		chosenSprites,
 		smallBallCount,
 		enableMiddleBlocks,
 		requiredBounce,
+		sfxEnabled,
 	});
 }
 
