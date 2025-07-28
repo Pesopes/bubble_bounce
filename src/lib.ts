@@ -404,7 +404,7 @@ export class Bubble {
     //TODO: color
     // drawCircle(ctx,this.pos, this.radius)
     // ctx.fillStyle = "rgb(200 0 0)";
-    this.rot = this.rot || Math.PI * 2 * Math.random();
+    this.rot = this.rot ?? Math.PI * 2 * Math.random();
 
 
     drawImage(ctx, sprite, this.pos, this.radius * 2, this.rot);
