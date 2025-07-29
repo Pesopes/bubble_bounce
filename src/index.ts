@@ -3,6 +3,8 @@ import backgroundImageSrc from "./assets/abstract_dots.svg";
 import { GameInputCallbacks, InputManager } from "./input";
 import { LocalStorageManager } from "./localStorage";
 import { Howl } from "howler";
+import { URLMultiplayer, SerializableGameState } from "./urlMultiplayer";
+import { URLMultiplayerGame } from "./urlMultiplayerGame";
 
 
 const ballSpriteModules = import.meta.glob("./assets/balls/*.webp", {
@@ -88,6 +90,7 @@ let previewBubbles: Bubble[] = [];
 
 enum GameState {
 	MainMenu,
+	URLMultiplayer,
 	Game,
 	EndScreen
 }
@@ -121,6 +124,13 @@ let renderLinesBetween = true;
 let chargeDir = -1;
 
 let inputManager: InputManager;
+
+// URL Multiplayer variables
+let isURLMultiplayer = false;
+let currentGameId = '';
+let turnNumber = 0;
+let waitingForOpponent = false;
+let shareURL = '';
 
 const fireForce = 18;
 
@@ -183,12 +193,30 @@ function prepareStart() {
 				canvas.height - startButtonDim.y - 100,
 			),
 			startButtonDim,
-			"START",
+			"START LOCAL",
 			(_but) => {
 				resetGame();
+				isURLMultiplayer = false;
 				gameState = GameState.Game;
 			},
 			"pink",
+		),
+	);
+	// URL MULTIPLAYER button (smaller, to the side)
+	const multiplayerButtonDim = new Vector(300, 100);
+	buttons.push(
+		new Button(
+			new Vector(
+				canvas.width - multiplayerButtonDim.x - 50,
+				50,
+			),
+			multiplayerButtonDim,
+			"SHARE & PLAY",
+			(_but) => {
+				gameState = GameState.URLMultiplayer;
+				prepareURLMultiplayerMenu();
+			},
+			"lightgreen",
 		),
 	);
 	//MIDDLE BLOCK TOGGLE
@@ -540,6 +568,15 @@ function init() {
 
 	loadSettings(getSettings());
 
+	// Check if there's a URL game to load automatically
+	const urlGameState = URLMultiplayer.loadFromURL();
+	if (urlGameState && URLMultiplayer.validateGameState(urlGameState)) {
+		// Auto-load URL game if present
+		console.log("Loading game from URL:", urlGameState);
+		loadURLGame(urlGameState);
+		return;
+	}
+
 	prepareBoard();
 
 	prepareStart();
@@ -560,6 +597,12 @@ function setupInput() {
 		onPointerDown: (pos) => {
 			mousePos = pos;
 			if (gameState === GameState.MainMenu) {
+				for (const button of buttons) {
+					button.checkClick(pos);
+				}
+				return;
+			}
+			if (gameState === GameState.URLMultiplayer) {
 				for (const button of buttons) {
 					button.checkClick(pos);
 				}
@@ -792,6 +835,13 @@ function update(tFrame: number) {
 		}
 		firstBounce = true;
 		isWaiting = false;
+
+		// Handle URL multiplayer turn completion
+		if (isURLMultiplayer) {
+			turnNumber++;
+			updateURLAfterMove();
+		}
+
 		// Make a save state after settling
 		saveStateBeforeShot = getSaveState();
 		// FIXME: doesn't getWinner() already check for a draw?
@@ -1069,6 +1119,236 @@ const zoomOut = () => {
 };
 
 
+// URL Multiplayer functions
+function prepareURLMultiplayerMenu() {
+	URLMultiplayerGame.prepareURLMultiplayerMenu(
+		canvas,
+		buttons,
+		previewBubbles,
+		(state: GameState) => { gameState = state; },
+		resetGame,
+		startNewURLGame,
+		loadFromPastedURL,
+		loadURLGame
+	);
+}
+
+function loadFromPastedURL(url: string) {
+	try {
+		console.log("Original URL:", url);
+
+		// Extract the hash part if it's a full URL
+		let hashPart = '';
+		if (url.includes('#game=')) {
+			hashPart = url.split('#game=')[1];
+			console.log("Found #game= format, extracted:", hashPart);
+		} else if (url.startsWith('game=')) {
+			hashPart = url.substring(5);
+			console.log("Found game= format, extracted:", hashPart);
+		} else if (url.startsWith('#game=')) {
+			hashPart = url.substring(6);
+			console.log("Found #game= at start, extracted:", hashPart);
+		} else {
+			// Assume it's just the encoded data
+			hashPart = url.trim();
+			console.log("Assuming raw data, using:", hashPart);
+		}
+
+		if (!hashPart || hashPart.length < 10) {
+			alert(`Invalid URL format. Expected format:\n\nhttps://yoursite.com/#game=ABC123...\n\nReceived: ${url}\nExtracted: ${hashPart || '(empty)'}`);
+			return;
+		}
+
+		console.log("Attempting to deserialize:", hashPart);
+
+		// Try to decode and load the game state
+		const gameState = URLMultiplayer.deserializeGameState(hashPart);
+		console.log("Deserialized game state:", gameState);
+
+		if (gameState && URLMultiplayer.validateGameState(gameState)) {
+			console.log("Game state is valid, loading...");
+			// Update the current URL to match (fix the hash format)
+			window.location.hash = `#game=${hashPart}`;
+			loadURLGame(gameState);
+		} else {
+			console.error("Game state validation failed");
+			alert(`Invalid or corrupted game URL.\n\nDeserialized data: ${gameState ? 'Success' : 'Failed'}\nValidation: ${gameState ? URLMultiplayer.validateGameState(gameState) : 'N/A'}\n\nPlease check that you copied the complete URL.`);
+		}
+	} catch (error) {
+		console.error('Error loading URL:', error);
+		alert(`Failed to load game from URL.\n\nError: ${error}\n\nURL: ${url}\n\nPlease check that you copied it correctly.`);
+	}
+}
+
+function startNewURLGame() {
+	// Initialize URL multiplayer game
+	isURLMultiplayer = true;
+	waitingForOpponent = false;
+	currentGameId = '';
+	turnNumber = 1;
+
+	// Start the game
+	gameState = GameState.Game;
+	resetGameForURL();
+
+	// Generate and show share URL
+	generateAndShowShareURL();
+}
+
+function loadURLGame(urlGameState: SerializableGameState) {
+	if (!URLMultiplayer.validateGameState(urlGameState)) {
+		alert("Invalid game state in URL!");
+		return;
+	}
+
+	// Load game state from URL
+	isURLMultiplayer = true;
+	currentGameId = urlGameState.gameId;
+	turnNumber = urlGameState.turnNumber + 1;
+	currentPlayer = urlGameState.currentPlayer;
+	firstBounce = urlGameState.firstBounce;
+
+	// Apply settings
+	smallBallCount = urlGameState.settings.smallBallCount;
+	enableMiddleBlocks = urlGameState.settings.enableMiddleBlocks;
+	requiredBounce = urlGameState.settings.requiredBounce;
+	chosenSprites = urlGameState.settings.chosenSprites;
+
+	// Restore game objects
+	const restored = URLMultiplayer.restoreGameObjects(urlGameState);
+	bubbles = restored.bubbles;
+	blocks = restored.blocks;
+
+	// Set waiting state (it's the other player's turn)
+	waitingForOpponent = false;
+
+	gameState = GameState.Game;
+	prepareOffscreenCanvas();
+
+	const stats = URLMultiplayer.getGameStats(urlGameState);
+	alert(`Game loaded! Turn ${urlGameState.turnNumber}\nPlayer 1: ${stats.player1Bubbles} bubbles\nPlayer 2: ${stats.player2Bubbles} bubbles\nYour turn!`);
+}
+
+function resetGameForURL() {
+	bubbles = [];
+	blocks = [];
+	buttons = [];
+	previewBubbles = [];
+	isWaiting = false;
+
+	if (sfxEnabled) fastForwardSound.stop();
+
+	prepareBoard();
+	const topPlayerCenter = new Vector(canvas.width / 2, distanceFromSide);
+	const bottomPlayerCenter = new Vector(
+		canvas.width / 2,
+		canvas.height - distanceFromSide,
+	);
+	spawnPlayerBalls(topPlayerCenter, chosenSprites[0], 1, true);
+	spawnPlayerBalls(bottomPlayerCenter, chosenSprites[1], 2, false);
+	prepareOffscreenCanvas();
+}
+
+function generateAndShowShareURL() {
+	shareURL = URLMultiplayer.generateShareURL(
+		bubbles,
+		blocks,
+		currentPlayer,
+		firstBounce,
+		turnNumber,
+		{
+			smallBallCount,
+			enableMiddleBlocks,
+			requiredBounce,
+			chosenSprites
+		},
+		currentGameId
+	);
+
+	console.log("Generated share URL:", shareURL);
+
+	// Extract game ID from URL for display
+	const urlParts = shareURL.split('#game=');
+	if (urlParts.length > 1) {
+		currentGameId = urlParts[1].substring(0, 8); // Show first 8 chars as ID
+	}
+
+	// Only show sharing dialog for turn 1 (initial game creation)
+	if (turnNumber === 1) {
+		showSharingDialog();
+		// Send to Discord if webhook configured
+		URLMultiplayerGame.sendGameInvitation(shareURL, currentGameId, turnNumber);
+	}
+}
+
+function showSharingDialog() {
+	// Simple implementation - in production you might want a proper modal
+	const shareText = `🎮 Bubble Bounce Game Started!\n\nGame ID: ${currentGameId}\nTurn: ${turnNumber}\n\nShare this URL with your friend:\n${shareURL}\n\nOr scan the QR code!`;
+
+	if (confirm(`${shareText}\n\nClick OK to copy URL to clipboard`)) {
+		URLMultiplayer.copyToClipboard(shareURL).then(() => {
+			alert("URL copied to clipboard! Send it to your friend.");
+		});
+	}
+}
+
+function updateURLAfterMove() {
+	if (!isURLMultiplayer) return;
+
+	// Generate new URL with updated game state
+	shareURL = URLMultiplayer.generateShareURL(
+		bubbles,
+		blocks,
+		currentPlayer,
+		firstBounce,
+		turnNumber,
+		{
+			smallBallCount,
+			enableMiddleBlocks,
+			requiredBounce,
+			chosenSprites
+		},
+		currentGameId
+	);
+
+	// Update browser URL
+	URLMultiplayer.updateURL(shareURL);
+
+	// Send turn update to Discord if webhook configured
+	const gameStats = URLMultiplayer.getGameStats({
+		gameId: currentGameId,
+		turnNumber,
+		currentPlayer,
+		firstBounce,
+		settings: { smallBallCount, enableMiddleBlocks, requiredBounce, chosenSprites },
+		bubbles: bubbles.map(b => ({
+			x: b.pos.x, y: b.pos.y, radius: b.radius, spriteIndex: b.spriteIndex,
+			player: b.player, rot: b.rot
+		})),
+		blocks: blocks.map(b => ({
+			x: b.pos.x, y: b.pos.y, width: b.dim.x, height: b.dim.y, borderRadius: b.borderRadius
+		}))
+	});
+
+	URLMultiplayerGame.sendTurnUpdate(shareURL, currentGameId, turnNumber, currentPlayer, {
+		player1Bubbles: gameStats.player1Bubbles,
+		player2Bubbles: gameStats.player2Bubbles
+	});
+
+	// Show sharing dialog for next turn
+	const shareText = `Your turn complete!\n\nTurn ${turnNumber}\nShare this URL with your opponent:\n${shareURL}`;
+
+	if (confirm(`${shareText}\n\nClick OK to copy URL to clipboard`)) {
+		URLMultiplayer.copyToClipboard(shareURL);
+	}
+
+	waitingForOpponent = true;
+}
+
+function renderURLMultiplayerMenu(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
+	URLMultiplayerGame.renderURLMultiplayerMenu(ctx, canvas, offscreenCanvas, buttons);
+}
+
 init();
 setupInput();
 // The main game loop
@@ -1080,6 +1360,8 @@ setupInput();
 		}
 		if (gameState === GameState.MainMenu) {
 			renderStart(ctx);
+		} else if (gameState === GameState.URLMultiplayer) {
+			renderURLMultiplayerMenu(ctx);
 		} else if (gameState === GameState.Game) {
 			update(tFrame);
 			render(ctx);
